@@ -209,7 +209,8 @@ def run_evolution(
 
         #  Logging
         if gen % 10 == 0:
-            print(f"Gen {gen}: Best Fitness = {best_score} (Stagnation: {stagnation_counter}/{stagnation_limit})")
+            pass
+            # print(f"Gen {gen}: Best Fitness = {best_score} (Stagnation: {stagnation_counter}/{stagnation_limit})")
 
         # Stagnation Logic
         if best_score < last_best_score:
@@ -222,7 +223,7 @@ def run_evolution(
 
         # Trigger Restart if Stuck
         if stagnation_counter >= stagnation_limit:
-            print(f"--> STUCK at score {best_score} for {stagnation_limit} gens. RESTARTING population...")
+            # print(f"--> STUCK at score {best_score} for {stagnation_limit} gens. RESTARTING population...")
             
             # WIPE EVERYTHING: Create a fresh random population from the initial board
             population = make_initial_population(initial_board, population_size)
