@@ -208,6 +208,6 @@ def run_evolution(
             continue
 
         # 7. Evolve (Selection -> Crossover -> Mutation)
-        population = evolve_population(population, fitness_scores, mutation_rate)
+        population = evolve_population(population, fitness_scores, mutation_rate, elitism_rate)
 
     return population[fitness_scores.argmin()]
