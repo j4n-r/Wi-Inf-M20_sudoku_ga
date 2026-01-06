@@ -1,20 +1,62 @@
 import time
 import timeit
-from ga import FIXED_SEED, SUDOKU, calculate_fitness, make_initial_population, mutate, run_evolution, set_seed, tournament_selection
+from typing import cast
+from ga import (
+    make_initial_population,
+    run_evolution,
+    set_mask,
+    set_seed,
+)
+import numpy as np
+import numpy.typing as npt
+
+# SUDOKU: npt.NDArray[np.int8] = np.array(
+#     [
+#         [5, 3, 0, 0, 7, 0, 0, 0, 0],
+#         [6, 0, 0, 1, 9, 5, 0, 0, 0],
+#         [0, 9, 8, 0, 0, 0, 0, 6, 0],
+#         [8, 0, 0, 0, 6, 0, 0, 0, 3],
+#         [4, 0, 0, 8, 0, 3, 0, 0, 1],
+#         [7, 0, 0, 0, 2, 0, 0, 0, 6],
+#         [0, 6, 0, 0, 0, 0, 2, 8, 0],
+#         [0, 0, 0, 4, 1, 9, 0, 0, 5],
+#         [0, 0, 0, 0, 8, 0, 0, 7, 9],
+#     ],
+#     dtype=np.int8,
+# )
+SUDOKU: npt.NDArray[np.int8] = np.array(
+    [
+        [0, 7, 0, 6, 5, 8, 0, 0, 2],
+        [0, 0, 1, 0, 4, 3, 0, 0, 8],
+        [8, 0, 0, 2, 0, 0, 7, 0, 0],
+        [5, 4, 0, 0, 0, 0, 0, 0, 1],
+        [0, 2, 0, 0, 0, 5, 3, 0, 0],
+        [0, 9, 0, 0, 0, 0, 2, 0, 6],
+        [0, 0, 0, 0, 0, 6, 4, 2, 0],
+        [0, 8, 6, 0, 0, 0, 0, 0, 5],
+        [0, 5, 2, 0, 7, 0, 0, 0, 0],
+    ],
+    dtype=np.int8,
+)
 
 
 def main():
     # 1. Bring the global RNG variable into scope
 
     # Now the rest of your logic runs with a fresh sequence
-    set_seed(FIXED_SEED)
+
+    SEED = 11
+    # set_seed(SEED)
+    set_mask(SUDOKU)
     population = make_initial_population(SUDOKU, 1000)
-    best = run_evolution(population, 100, 0.08)
+    best = run_evolution(SUDOKU, population, 200, 0.10, 1, 60)
+
 
 if __name__ == "__main__":
     ITERATIONS = 10
+
     execution_time = timeit.timeit(main, number=ITERATIONS)
-    # main()
+    main()
 
     print(f"Average time per run: {execution_time / ITERATIONS:.6f} seconds")
 
@@ -22,26 +64,5 @@ if __name__ == "__main__":
 
 # 1.70
 
+# 0.72
 
-
-# import multiprocessing
-# import os
-
-# def run_one_instance(run_id):
-#     population = make_initial_population(SUDOKU, 1000)
-#     best_individual = run_evolution(population, 100, 0.08)
-#     fitness = calculate_fitness(best_individual)
-#     return (fitness, best_individual)
-
-# if __name__ == '__main__':
-#     # Dynamically get core count
-#     cores = os.cpu_count()
-#     print(f"Detected {cores} cores. Launching {cores} parallel evolutions...")
-
-#     with multiprocessing.Pool(processes=cores) as pool:
-#         all_results = pool.map(run_one_instance, range(cores))
-    
-#     best_fitness, best_board = max(all_results, key=lambda x: x[0])
-    
-#     print(f"Best Fitness: {best_fitness}")
-#     print(best_board)
