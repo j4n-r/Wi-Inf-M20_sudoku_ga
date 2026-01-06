@@ -1,22 +1,30 @@
 from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
-from typing import cast
 
 type SudokuCandidate = npt.NDArray[np.int8]
 type SudokuPopulation = npt.NDArray[np.int8]
 
 GRID_SIZE = 9
-fixed_mask = []
+fixed_mask: npt.NDArray[np.bool_] = np.empty((0, 0), dtype=np.bool_)
+row_mutable_indices: list[npt.NDArray[np.intp]] = []
 my_rng = np.random.default_rng()
+
 
 def set_seed(seed: int):
     global my_rng
     my_rng = np.random.default_rng(seed)
 
+
 def set_mask(sudoku):
-    global fixed_mask
-    fixed_mask = cast(npt.NDArray[np.bool_], sudoku == 0)
+    """
+    Cache mutable cell positions to avoid recomputing them inside hot loops.
+    """
+    global fixed_mask, row_mutable_indices
+    # marks mutable values
+    fixed_mask = sudoku == 0
+    # get all the indices of all mutable values
+    row_mutable_indices = [np.nonzero(fixed_mask[i])[0] for i in range(GRID_SIZE)]
 
 # TODO no how idea how this works
 def calculate_population_fitness(population: SudokuPopulation) -> np.ndarray:
@@ -100,29 +108,50 @@ def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
     Iterates through EVERY row. If a row hits the mutation_rate,
     we swap two non-fixed numbers in that row.
     """
-    for row_idx in range(GRID_SIZE):
-        if my_rng.random() < mutation_rate:
-            # Get indices that were not in the intial sudoku 
-            mutable_indices = np.where(fixed_mask[row_idx])[0]
+    # get all rows where we should mutate
+    mutate_rows = my_rng.random(GRID_SIZE) < mutation_rate
+    # iterate over the nonzero rows (where the mutation rate was higher than the random number)
+    for row_idx in np.nonzero(mutate_rows)[0]:
+        # check if at least 2 values are mutable in this row
+        mutable_indices = row_mutable_indices[row_idx]
+        if mutable_indices.size < 2:
+            continue
 
-            # NOTE we assume that each row has at least 2 non intial values
-
-            # replace=False ensures we pick two different indices
-            i1, i2 = my_rng.choice(mutable_indices, size=2, replace=False)
-
-            # Swap values
-            sudoku[row_idx, i1], sudoku[row_idx, i2] = (
-                sudoku[row_idx, i2],
-                sudoku[row_idx, i1],
-            )
+        # get two random indices out of the mutable ones 
+        i1, i2 = my_rng.choice(mutable_indices, size=2, replace=False)
+        # swap the values in the row
+        sudoku[row_idx, i1], sudoku[row_idx, i2] = sudoku[row_idx, i2], sudoku[row_idx, i1]
     return sudoku
 
 
+def batch_tournament_winners(fitness_scores: np.ndarray, selection_count: int, tournament_members: int = 3) -> np.ndarray:
+    """
+    Vectorized tournament selection: pick winners for all children in one go.
+    """
+    # get the population size from the fitness_scores since they have the same shape
+    population_size = fitness_scores.shape[0]
+    # select K times N random tournament candidates where N is tournament_members and K is selection count
+    # e.g. selection_count=2 tournament_members=3 ==> array([2,5,7],[3,8,10])
+    candidates = my_rng.integers(0, population_size, size=(selection_count, tournament_members))
+    # get the fitness scores of the candidates, has the same shape as candidates but holds the fitness_scores
+    candidate_scores = fitness_scores[candidates]
+    # the the index for each candidate_scores subarray for the members with the lowest score
+    # e.g. candidate_scores = array([2,5,7],[3,8,10]) ===> winner_offset =  array([1,2,1,2])
+    winner_offsets = candidate_scores.argmin(axis=1)
+    # gets the index of all the winners into population
+    winners = np.take_along_axis(candidates, winner_offsets[:, None], axis=1).reshape(-1)
+    return winners
+
+
 def evolve_population(
-        current_pop: SudokuPopulation, fitness_scores: np.ndarray, mutation_rate: float, elitism_rate: int
+    current_pop: SudokuPopulation,
+    fitness_scores: np.ndarray,
+    mutation_rate: float,
+    elitism_rate: int,
 ) -> SudokuPopulation:
-    pop_size = len(current_pop)
+    population_size = len(current_pop)
     next_gen = np.empty_like(current_pop)
+    offspring_count = population_size - elitism_rate
 
     # --- Elitism ---
     # Get indices of fitness scores sorted from lowest (best) to highest (worst)
@@ -132,23 +161,21 @@ def evolve_population(
     elite_indices = sorted_indices[:elitism_rate]
     
     # Copy the elite boards into the start of next_gen
-    next_gen[:elitism_rate] = current_pop[elite_indices].copy()
+    next_gen[:elitism_rate] = current_pop[elite_indices]
 
-    # --- Reproduction ---
-    # Start the loop from 'elitism_rate' so we don't overwrite the elites
-    for i in range(elitism_rate, pop_size):
-        
-        # Pick parents 
-        p1 = tournament_selection(current_pop, fitness_scores)
-        p2 = tournament_selection(current_pop, fitness_scores)
+    # --- Reproduction (batched selections) ---
+    parent_indices_1 = batch_tournament_winners(fitness_scores, offspring_count)
+    parent_indices_2 = batch_tournament_winners(fitness_scores, offspring_count)
+    crossover_points = my_rng.integers(1, GRID_SIZE, size=offspring_count)
 
-        # Make child
-        child = crossover(p1, p2)
-
+    # iterate over all three arrays at the same time
+    for offset, (p1_idx, p2_idx, point) in enumerate(zip(parent_indices_1, parent_indices_2, crossover_points)):
+        # get both the parents out f parent_indices_1 and parent_indices_2 and make a child
+        child = crossover(current_pop[p1_idx], current_pop[p2_idx])
         # mutate child
         mutate(child, mutation_rate)
-
-        next_gen[i] = child
+        # add the child to the new generation
+        next_gen[elitism_rate + offset] = child
 
     return next_gen
 
@@ -168,23 +195,23 @@ def run_evolution(
     population_size = population.shape[0]
 
     for gen in range(generations):
-        # 1. Calculate Fitness
+        # Calculate Fitness for the whole generation
         fitness_scores = calculate_population_fitness(population)
         
-        # 2. Find Best Score
+        # Find Best Score
         best_idx = fitness_scores.argmin()
         best_score = fitness_scores[best_idx]
 
-        # 3. Check for Solution
+        #  Check for Solution
         if best_score == 0:
             print(f"Gen {gen}: SOLVED!")
             return population[best_idx]
 
-        # 4. Logging
+        #  Logging
         if gen % 10 == 0:
             print(f"Gen {gen}: Best Fitness = {best_score} (Stagnation: {stagnation_counter}/{stagnation_limit})")
 
-        # 5. Stagnation Logic
+        # Stagnation Logic
         if best_score < last_best_score:
             # We found a better score! Reset the counter.
             last_best_score = best_score
@@ -193,7 +220,7 @@ def run_evolution(
             # No improvement (or worse). Increment counter.
             stagnation_counter += 1
 
-        # 6. Trigger Restart if Stuck
+        # Trigger Restart if Stuck
         if stagnation_counter >= stagnation_limit:
             print(f"--> STUCK at score {best_score} for {stagnation_limit} gens. RESTARTING population...")
             
@@ -207,7 +234,7 @@ def run_evolution(
             # Skip the 'evolve' step this turn since we just made new ones
             continue
 
-        # 7. Evolve (Selection -> Crossover -> Mutation)
+        # Evolve (Selection -> Crossover -> Mutation)
         population = evolve_population(population, fitness_scores, mutation_rate, elitism_rate)
 
     return population[fitness_scores.argmin()]
