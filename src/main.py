@@ -1,4 +1,5 @@
 import argparse
+import csv
 import multiprocessing as mp
 import time
 import timeit
@@ -11,7 +12,7 @@ from ga import (
     set_seed,
 )
 
-SUDOKU: npt.NDArray[np.int8] = np.array(
+test_sudoku: npt.NDArray[np.int8] = np.array(
     [
         [5, 3, 0, 0, 7, 0, 0, 0, 0],
         [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -44,12 +45,25 @@ SUDOKU: npt.NDArray[np.int8] = np.array(
 def run_once(seed: int):
     """Run one GA solve with an isolated RNG/mask per process."""
     set_seed(seed)
-    set_mask(SUDOKU)
-    population = make_initial_population(SUDOKU, 15)
-    return run_evolution(SUDOKU, population, 10, 0.10, 10, 30)
+    set_mask(test_sudoku)
+    population = make_initial_population(test_sudoku, 15)
+    return run_evolution(test_sudoku, population, 10, 0.10, 10, 30)
 
 
-def main():
+def iter_puzzles_from_csv(path: str):
+    """Yield (quiz, solution) strings from a Sudoku CSV with quizzes/solutions columns."""
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            yield row["quizzes"], row["solutions"]
+
+
+def str_to_board(s: str) -> npt.NDArray[np.int8]:
+    """Convert 81-char digit string (0 for blanks) into 9x9 int8 board."""
+    return np.fromiter((ord(ch) - 48 for ch in s.strip()), dtype=np.int8, count=81).reshape(9, 9)
+
+
+def solve_current_board():
     worker_count = mp.cpu_count()
     base_seed = 11
     seeds = [base_seed + i for i in range(worker_count)]
@@ -73,12 +87,23 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the Sudoku GA solver.")
-    parser.add_argument(
+    _ = parser.add_argument(
+        "--csv",
+        type=str,
+        help="Path to sudoku.csv (quizzes,solutions). Uses puzzles from the file instead of the hardcoded one.",
+    )
+    _ = parser.add_argument(
+        "--count",
+        type=int,
+        default=1,
+        help="Number of puzzles to take from the CSV (only when --csv is set).",
+    )
+    _ = parser.add_argument(
         "--timeit",
         action="store_true",
-        help="Benchmark main() with timeit (spawns processes each iteration).",
+        help="Benchmark solve_current_board() with timeit (spawns processes each iteration).",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--iterations",
         type=int,
         default=5,
@@ -86,10 +111,26 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.timeit:
-        duration = timeit.timeit(main, number=args.iterations)
-        print(f"Average time per run: {duration / args.iterations:.6f} seconds over {args.iterations} runs.")
+    if args.csv:
+        if args.timeit:
+            print("--timeit is ignored when --csv is set; running each puzzle once.")
+        puzzles = []
+        for i, (quiz, solution) in enumerate(iter_puzzles_from_csv(args.csv)):
+            if i >= args.count:
+                break
+            puzzles.append((quiz, solution))
+        if not puzzles:
+            raise SystemExit(f"No rows found in {args.csv}")
+
+        for idx, (quiz, solution) in enumerate(puzzles, start=1):
+            test_sudoku = str_to_board(quiz)
+            print(f"Puzzle {idx}/{len(puzzles)} from {args.csv}")
+            _ = solve_current_board()
     else:
-        main()
+        if args.timeit:
+            duration = timeit.timeit(solve_current_board, number=args.iterations)
+            print(f"Average time per run: {duration / args.iterations:.6f} seconds over {args.iterations} runs.")
+        else:
+            _ = solve_current_board()
 # 14s
 # 14.67

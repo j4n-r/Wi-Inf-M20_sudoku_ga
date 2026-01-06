@@ -103,7 +103,7 @@ def crossover(parent1: SudokuCandidate, parent2: SudokuCandidate) -> SudokuCandi
     return child_sudoku
 
 
-def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
+def mutate(sudoku: SudokuCandidate, mutation_rate: float):
     """
     Iterates through EVERY row. If a row hits the mutation_rate,
     we swap two non-fixed numbers in that row.
@@ -121,7 +121,6 @@ def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
         i1, i2 = my_rng.choice(mutable_indices, size=2, replace=False)
         # swap the values in the row
         sudoku[row_idx, i1], sudoku[row_idx, i2] = sudoku[row_idx, i2], sudoku[row_idx, i1]
-    return sudoku
 
 
 def batch_tournament_winners(fitness_scores: np.ndarray, selection_count: int, tournament_members: int = 3) -> np.ndarray:
@@ -129,7 +128,7 @@ def batch_tournament_winners(fitness_scores: np.ndarray, selection_count: int, t
     Vectorized tournament selection: pick winners for all children in one go.
     """
     # get the population size from the fitness_scores since they have the same shape
-    population_size = fitness_scores.shape[0]
+    population_size: int = fitness_scores.shape[0]
     # select K times N random tournament candidates where N is tournament_members and K is selection count
     # e.g. selection_count=2 tournament_members=3 ==> array([2,5,7],[3,8,10])
     candidates = my_rng.integers(0, population_size, size=(selection_count, tournament_members))
@@ -187,12 +186,12 @@ def run_evolution(
     mutation_rate: float,
     elitism_rate:int,
     stagnation_limit: int = 100
-):
+) -> int:
     # Track the best score seen so far to detect stagnation
     last_best_score = float('inf')
     stagnation_counter = 0
     
-    population_size = population.shape[0]
+    population_size: int = population.shape[0]
 
     for gen in range(generations):
         # Calculate Fitness for the whole generation
@@ -200,7 +199,7 @@ def run_evolution(
         
         # Find Best Score
         best_idx = fitness_scores.argmin()
-        best_score = fitness_scores[best_idx]
+        best_score: int = fitness_scores[best_idx]
 
         #  Check for Solution
         if best_score == 0:
