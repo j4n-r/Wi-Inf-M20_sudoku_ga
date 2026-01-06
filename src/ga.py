@@ -22,7 +22,12 @@ SUDOKU: npt.NDArray[np.int8] = np.array(
 )
 GRID_SIZE = 9
 FIXED_MASK = cast(npt.NDArray[np.bool_], SUDOKU != 0)
-RNG = np.random.default_rng(FIXED_SEED)
+my_rng = np.random.default_rng()
+FIXED_SEED = 10
+
+def set_seed(seed: int):
+    global my_rng
+    my_rng = np.random.default_rng(seed)
 
 def fill_initial_sudoku(sudoku: SudokuCandidate):
     """Make sure that each row has 1-9 in them respecting the intial values"""
@@ -30,55 +35,29 @@ def fill_initial_sudoku(sudoku: SudokuCandidate):
         initial_numbers = set(row)
         missing_numbers = [n for n in range(1, 10) if n not in initial_numbers]
         # shuffle array
-        shuffled_numbers = RNG.permutation(missing_numbers)
+        shuffled_numbers = my_rng.permutation(missing_numbers)
         # Create a boolean mask to find all positions that are 0 (True for 0, False otherwise),
         # then directly assign the shuffled_numbers into those specific slots.
         row[row == 0] = shuffled_numbers
 
 
 def calculate_fitness(sudoku: SudokuCandidate) -> int:
-    """
-    Calculates a score based on duplicates in columns and 3x3 blocks.
-    Lower is better. 0 = Solved.
-    """
+    """Vectorized fitness calculation."""
     penalty = 0
-
-    # 1. Check Columns
-    # We iterate over column indices (0 to 8)
-    for c in range(GRID_SIZE):
-        col = sudoku[:, c]
-        # A perfect column has 9 unique numbers.
-        # If it has 7 unique numbers, it means 2 are missing/duplicated.
-        penalty += GRID_SIZE - len(np.unique(col))
-
-    # 2. Check 3x3 Blocks
-    # We step through the grid in jumps of 3 (0, 3, 6)
-    for r in range(0, GRID_SIZE, 3):
-        for c in range(0, GRID_SIZE, 3):
-            # Slice out the 3x3 subgrid
-            block = sudoku[r : r + 3, c : c + 3]
-            penalty += GRID_SIZE - len(np.unique(block))
-
-    return penalty
-
-# TODO test if this is faster
-# def calculate_fitness(sudoku: SudokuCandidate) -> int:
-#     """Vectorized fitness calculation."""
-#     penalty = 0
     
-#     # 1. Check Columns (Transpose makes columns into rows)
-#     #    Iterating over .T is faster than indexing [:, c]
-#     for col in sudoku.T:
-#         penalty += (GRID_SIZE - len(np.unique(col)))
+    # 1. Check Columns (Transpose makes columns into rows)
+    #    Iterating over .T is faster than indexing [:, c]
+    for col in sudoku.T:
+        penalty += (GRID_SIZE - len(np.unique(col)))
 
-#     # 2. Check Blocks 
-#     #    Magic reshape: (9,9) -> (3,3,3,3) -> swap axes -> (3,3,3,3) -> (9,9)
-#     #    This transforms 3x3 blocks into linear rows
-#     blocks = sudoku.reshape(3, 3, 3, 3).swapaxes(1, 2).reshape(9, 9)
-#     for block in blocks:
-#         penalty += (GRID_SIZE - len(np.unique(block)))
+    # 2. Check Blocks 
+    #    Magic reshape: (9,9) -> (3,3,3,3) -> swap axes -> (3,3,3,3) -> (9,9)
+    #    This transforms 3x3 blocks into linear rows
+    blocks = sudoku.reshape(3, 3, 3, 3).swapaxes(1, 2).reshape(9, 9)
+    for block in blocks:
+        penalty += (GRID_SIZE - len(np.unique(block)))
         
-#     return penalty
+    return penalty
 
 
 def make_initial_population(
@@ -100,7 +79,7 @@ def tournament_selection(
     
     # 1. Pick random INDICES, not the actual boards
     pop_size = len(population)
-    indices = RNG.integers(0, pop_size, size=k)
+    indices = my_rng.integers(0, pop_size, size=k)
     
     # 2. Look up their pre-calculated scores
     #    We want the index with the LOWEST score
@@ -110,7 +89,7 @@ def tournament_selection(
 
 def crossover(parent1: SudokuCandidate, parent2: SudokuCandidate) -> SudokuCandidate:
     # Use RNG.integers with endpoint=True to allow cutting after the 8th row
-    point = RNG.integers(1, GRID_SIZE) 
+    point = my_rng.integers(1, GRID_SIZE) 
     
     # FIX: Ensure strict type consistency
     child_sudoku = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.int8)
@@ -126,7 +105,7 @@ def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
     we swap two non-fixed numbers in that row.
     """
     for  row_idx in range(GRID_SIZE):
-        if RNG.random() < mutation_rate:
+        if my_rng.random() < mutation_rate:
 
             # 1. Get indices that are strictly mutable (False in fixed_mask)
             mutable_indices = np.where(~FIXED_MASK[row_idx])[0]
@@ -134,7 +113,7 @@ def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
             # 2. We need at least 2 numbers to swap
             if len(mutable_indices) >= 2:
                 # IMPORTANT: replace=False ensures we pick two DIFFERENT indices
-                i1, i2 = RNG.choice(mutable_indices, size=2, replace=False)
+                i1, i2 = my_rng.choice(mutable_indices, size=2, replace=False)
                 
                 # 3. Swap values
                 sudoku[row_idx, i1], sudoku[row_idx, i2] = sudoku[row_idx, i2], sudoku[row_idx, i1]
