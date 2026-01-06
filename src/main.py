@@ -46,8 +46,16 @@ def run_once(seed: int):
     """Run one GA solve with an isolated RNG/mask per process."""
     set_seed(seed)
     set_mask(test_sudoku)
-    population = make_initial_population(test_sudoku, 15)
-    return run_evolution(test_sudoku, population, 10, 0.10, 10, 30)
+    population = make_initial_population(test_sudoku, 10)
+    return run_evolution(
+        initial_board=test_sudoku,
+        population=population,
+        generations=10,
+        mutation_rate=0.10,
+        elitism_rate=10,
+        tournament_members=3,
+        stagnation_limit=30,
+    )
 
 
 def iter_puzzles_from_csv(path: str):
@@ -60,7 +68,9 @@ def iter_puzzles_from_csv(path: str):
 
 def str_to_board(s: str) -> npt.NDArray[np.int8]:
     """Convert 81-char digit string (0 for blanks) into 9x9 int8 board."""
-    return np.fromiter((ord(ch) - 48 for ch in s.strip()), dtype=np.int8, count=81).reshape(9, 9)
+    return np.fromiter(
+        (ord(ch) - 48 for ch in s.strip()), dtype=np.int8, count=81
+    ).reshape(9, 9)
 
 
 def solve_current_board():
@@ -81,7 +91,9 @@ def solve_current_board():
         pool.join()
 
     elapsed = time.perf_counter() - start
-    print(f"First worker finished in {elapsed:.3f} seconds using {worker_count} workers.")
+    print(
+        f"First worker finished in {elapsed:.3f} seconds using {worker_count} workers."
+    )
     return best
 
 
@@ -129,7 +141,9 @@ if __name__ == "__main__":
     else:
         if args.timeit:
             duration = timeit.timeit(solve_current_board, number=args.iterations)
-            print(f"Average time per run: {duration / args.iterations:.6f} seconds over {args.iterations} runs.")
+            print(
+                f"Average time per run: {duration / args.iterations:.6f} seconds over {args.iterations} runs."
+            )
         else:
             _ = solve_current_board()
 # 14s
