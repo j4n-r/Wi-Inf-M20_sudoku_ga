@@ -46,12 +46,11 @@ def run_once(seed: int):
     """Run one GA solve with an isolated RNG/mask per process."""
     set_seed(seed)
     set_mask(test_sudoku)
-    population = make_initial_population(test_sudoku, 10)
+    population = make_initial_population(test_sudoku, 800)
     return run_evolution(
         initial_board=test_sudoku,
         population=population,
-        generations=10,
-        mutation_rate=0.10,
+        mutation_rate=0.12,
         elitism_rate=10,
         tournament_members=3,
         stagnation_limit=30,

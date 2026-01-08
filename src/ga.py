@@ -188,7 +188,6 @@ def evolve_population(
 def run_evolution(
     initial_board: SudokuCandidate,
     population: SudokuPopulation,
-    generations: int,
     mutation_rate: float,
     elitism_rate: int,
     tournament_members: int,
@@ -200,7 +199,8 @@ def run_evolution(
 
     population_size: int = population.shape[0]
 
-    for gen in range(generations):
+    gen = 0
+    while True:
         # Calculate Fitness for the whole generation
         fitness_scores = calculate_population_fitness(population)
 
@@ -239,6 +239,7 @@ def run_evolution(
             last_best_score = float("inf")
 
             # Skip the 'evolve' step this turn since we just made new ones
+            gen += 1
             continue
 
         # Evolve (Selection -> Crossover -> Mutation)
@@ -246,4 +247,4 @@ def run_evolution(
             population, fitness_scores, mutation_rate, elitism_rate, tournament_members
         )
 
-    return population[fitness_scores.argmin()]
+        gen += 1
