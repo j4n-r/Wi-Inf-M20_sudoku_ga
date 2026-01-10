@@ -33,7 +33,6 @@ test_sudoku2: list[list[int]] = [
 
 
 def run_once(seed: int):
-    """Run one GA solve with an isolated RNG/mask per process."""
     random.seed(seed)
     set_mask(test_sudoku)
     population = make_initial_population(test_sudoku, 1000)
