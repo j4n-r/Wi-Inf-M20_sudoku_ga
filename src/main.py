@@ -38,8 +38,9 @@ test_sudoku: list[list[int]] = [
 
 # Program config
 SEED = 10
-USE_PARALLELIZATION = "False" # "True" or "False"
-GUI = "Generations" # "Sudoku" or "Generations" 
+USE_PARALLELIZATION = "True" # "True" or "False"
+GUI = "Generations" # "Sudoku", "Generations", or "None"
+RUNS = 1  # number of repeated runs for timing
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
@@ -51,7 +52,7 @@ STAGNATION_LIMIT = 70
 CHUNK_SIZE = 400 # how big the array of sudokus is for the fitness calculation for each worker
 
 
-def run_once(seed: int):
+def run_once(seed: int) -> float:
     then = time.perf_counter()
     random.seed(seed)
     set_mask(INTITIAL_BOARD)
@@ -68,11 +69,18 @@ def run_once(seed: int):
         chunk_size=CHUNK_SIZE
     )
     now = time.perf_counter()
-    print(f"It took {now - then}")
+    elapsed = now - then
+    print(f"It took {elapsed}")
+    return elapsed
 
 
 if __name__ == "__main__":
-    run_once(SEED)
+    timings: list[float] = []
+    for offset in range(RUNS):
+        timings.append(run_once(SEED + offset))
+    if RUNS > 1:
+        average = sum(timings) / RUNS
+        print(f"Average over {RUNS} runs: {average}")
     # set_mask(test_sudoku)
     # population =  make_initial_population(test_sudoku, 2)
     # print(calculate_population_fitness(population))
