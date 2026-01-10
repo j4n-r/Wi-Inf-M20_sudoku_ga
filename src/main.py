@@ -5,8 +5,11 @@ import time
 from rich.console import Console
 from rich.live import Live
 from ga import (
+    calculate_population_fitness,
+    crossover,
     debug_print,
     make_initial_population,
+    mutate,
     run_evolution,
     set_mask,
     set_seed,
@@ -54,3 +57,11 @@ def run_once(seed: int):
 if __name__ == "__main__":
     set_mask(test_sudoku)
     population =  make_initial_population(test_sudoku, 2)
+    print(calculate_population_fitness(population))
+
+    child = crossover(population[0], population[1])
+    print("Child")
+    debug_print(child)
+    child = mutate(child, 1)
+    print("Child mutated")
+    debug_print(child)

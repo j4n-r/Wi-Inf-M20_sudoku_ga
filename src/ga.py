@@ -8,7 +8,6 @@ from ui import render_sudoku
 type SudokuCandidate = list[list[int]]
 type SudokuPopulation = list[SudokuCandidate]
 
-GRID_SIZE = 9
 fixed_mask: list[list[bool]] = []
 row_mutable_indices: list[list[int]] = []
 # my_rng = random.
@@ -55,7 +54,7 @@ def make_initial_population(sudoku: SudokuCandidate, population_size: int)  -> S
         # Create a fresh copy for this individual
         child = deepcopy(sudoku)
         
-        for row_idx in range(GRID_SIZE):
+        for row_idx in range(9):
             # Get the specific missing numbers for THIS row
             # We copy it because random.shuffle works in-place
             missing_vals = missing_numbers[row_idx][:] 
@@ -74,21 +73,70 @@ def make_initial_population(sudoku: SudokuCandidate, population_size: int)  -> S
             
 
 
-
 def calculate_population_fitness(population: SudokuPopulation) -> list[int]:
-    pass
+    """
+    Fitness = number of conflicts in columns and 3x3 boxes.
+    Lower is better. 0 means a solved Sudoku.
+    """
+    fitness_scores: list[int] = []
+
+    for sudoku in population:
+        conflicts = 0
+
+        # --- column conflicts ---
+        for col in range(9):
+            column_values = [sudoku[row][col] for row in range(9)]
+            conflicts += 9 - len(set(column_values))
+
+        # --- 3x3 box conflicts ---
+        for box_row in range(0, 9, 3):
+            for box_col in range(0, 9, 3):
+                box_values: list[int] = []
+                for r in range(box_row, box_row + 3):
+                    for c in range(box_col, box_col + 3):
+                        box_values.append(sudoku[r][c])
+                conflicts += 9 - len(set(box_values))
+
+        fitness_scores.append(conflicts)
+    return fitness_scores
 
 
 def crossover(parent1: SudokuCandidate, parent2: SudokuCandidate) -> SudokuCandidate:
-    pass
+    """
+    Row-based crossover.
+
+    Pick a cut point, take the top part of rows from parent1 and the rest from parent2.
+    This preserves row validity because whole rows are copied.
+    """
+    cut = random.randint(1, 9 - 1)  # 1..8 so both parents contribute
+
+    child: SudokuCandidate = []
+    for row_idx in range(9):
+        if row_idx < cut:
+            child.append(parent1[row_idx][:])  # copy row
+        else:
+            child.append(parent2[row_idx][:])  # copy row
+
+    return child
 
 
-def mutate(sudoku: SudokuCandidate, mutation_rate: float):
+def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
     """
-    Iterates through EVERY row. If a row hits the mutation_rate,
-    we swap two non-fixed numbers in that row.
+    For each row: with probability mutation_rate, swap two *mutable* cells in that row.
+    Fixed cells (givens) are never changed.
     """
-    pass
+    for r in range(9):
+        if random.random() >= mutation_rate:
+            continue
+
+        mutable_cols = row_mutable_indices[r]
+        if len(mutable_cols) < 2:
+            continue  # nothing to swap
+
+        c1, c2 = random.sample(mutable_cols, 2)
+        sudoku[r][c1], sudoku[r][c2] = sudoku[r][c2], sudoku[r][c1]
+
+    return sudoku
 
 def batch_tournament_winners(
     fitness_scores: list[int], selection_count: int, tournament_members: int = 3
