@@ -6,7 +6,8 @@ Collecting samples from 'python src/main.py' (python v3.12.12)
 Total Samples 600
 GIL: 100.00%, Active: 100.00%, Threads: 1
 
-  %Own   %Total  OwnTime  TotalTime  Function(filename)                                                                                                                                                                                                                                               63.00%  63.00%    3.70s     3.70s   calculate_population_fitness (ga.py)
+  %Own   %Total  OwnTime  TotalTimeFunction(filename)
+  63.00%  63.00%    3.70s     3.70s   calculate_population_fitness (ga.py)
   4.00%  13.00%   0.570s    0.970s   sample (random.py)
   5.00%  11.00%   0.440s    0.640s   crossover (ga.py)
  11.00%  11.00%   0.420s    0.420s   _randbelow_with_getrandbits (random.py)
