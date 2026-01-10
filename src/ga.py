@@ -91,8 +91,8 @@ def calculate_fitness_for_chunk(grid: SudokuCandidate) -> int:
 
     return conflicts
 
-def calculate_fitness_parallel(population: SudokuPopulation, ex: ProcessPoolExecutor) -> list[int]:
-    return list(ex.map(calculate_fitness_for_chunk, population, chunksize=256))
+def calculate_fitness_parallel(population: SudokuPopulation, ex: ProcessPoolExecutor, chunk_size: int) -> list[int]:
+    return list(ex.map(calculate_fitness_for_chunk, population, chunksize=chunk_size))
 
 
 def calculate_fitness(population: SudokuPopulation) -> list[int]:
@@ -254,13 +254,14 @@ def run_evolution(
     stagnation_limit: int = 100,
     use_parallelization: bool = True,
     gui_mode: str = "Sudoku",
+    chunk_size: int = 256
 ):
     population_size: int = len(population)
 
     best_fitness_ever: int = 100
     generations_without_improvement: int = 0
     generation: int = 0
-    all_generations: int = 0
+    global_generations: int = 0
 
     show_board = gui_mode == "Sudoku"
     show_generations = gui_mode == "Generations"
@@ -274,7 +275,7 @@ def run_evolution(
         if show_generations:
             print(
                 "Best fitness at generation "
-                f"{generation}: {best_fitness_now} --- Global Generation {all_generations}"
+                f"{generation}: {best_fitness_now} --- Global Generation {global_generations}"
             )
         if show_board:
             update_board(best_individual)
@@ -282,7 +283,7 @@ def run_evolution(
     if use_parallelization:
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
             while True:
-                fitness_scores = calculate_fitness_parallel(population, ex)
+                fitness_scores = calculate_fitness_parallel(population, ex,chunk_size)
                 best_fitness_now = min(fitness_scores)
                 best_index = fitness_scores.index(best_fitness_now)
                 best_individual = population[best_index]
@@ -291,7 +292,7 @@ def run_evolution(
 
                 # SOLVED
                 if best_fitness_now == 0:
-                    print("SOLVED")
+                    print(f"SOLVED in Generation: {global_generations}")
                     return best_individual, generation
 
                 # Track if we improved
@@ -319,7 +320,7 @@ def run_evolution(
                 )
 
                 generation += 1
-                all_generations += 1
+                global_generations += 1
     else:
         while True:
             fitness_scores = calculate_fitness(population)
@@ -331,7 +332,7 @@ def run_evolution(
 
             # SOLVED
             if best_fitness_now == 0:
-                print("SOLVED")
+                print(f"SOLVED in Generation: {global_generations}")
                 return best_individual, generation
 
             # Track if we improved
@@ -359,4 +360,4 @@ def run_evolution(
             )
 
             generation += 1
-            all_generations += 1
+            global_generations += 1

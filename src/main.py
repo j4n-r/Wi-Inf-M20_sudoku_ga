@@ -38,8 +38,8 @@ test_sudoku: list[list[int]] = [
 
 # Program config
 SEED = 10
-USE_PARALLELIZATION = "True" # "True" or "False"
-GUI = "Sudoku" # "Sudoku" or "Generations" 
+USE_PARALLELIZATION = "False" # "True" or "False"
+GUI = "Generations" # "Sudoku" or "Generations" 
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
@@ -48,6 +48,7 @@ MUTATION_RATE = 0.05
 ELITISM_RATE = 10 
 TOURNAMENT_MEMBERS = 3
 STAGNATION_LIMIT = 70
+CHUNK_SIZE = 400 # how big the array of sudokus is for the fitness calculation for each worker
 
 
 def run_once(seed: int):
@@ -64,6 +65,7 @@ def run_once(seed: int):
         stagnation_limit=STAGNATION_LIMIT,
         use_parallelization=USE_PARALLELIZATION == "True",
         gui_mode=GUI,
+        chunk_size=CHUNK_SIZE
     )
     now = time.perf_counter()
     print(f"It took {now - then}")
