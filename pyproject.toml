@@ -3,7 +3,8 @@ name = "sudoku-ga"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.4.0",
+    "py-spy>=0.4.1",
 ]
