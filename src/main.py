@@ -36,9 +36,9 @@ test_sudoku: list[list[int]] = [
 # Config  #
 ###########
 
-# Parallelization
+# Program config
 SEED = 10
-USE_PARALLELIZATION = "True" # "True" or "Multi" or "Numpy"
+USE_PARALLELIZATION = "True" # "True" or "False"
 GUI = "Sudoku" # "Sudoku" or "Generations" 
 
 # Parameters
@@ -53,22 +53,24 @@ STAGNATION_LIMIT = 70
 def run_once(seed: int):
     then = time.perf_counter()
     random.seed(seed)
-    set_mask(test_sudoku)
-    population = make_initial_population(test_sudoku, 8000)
+    set_mask(INTITIAL_BOARD)
+    population = make_initial_population(INTITIAL_BOARD, POPULATION_SIZE)
     (winning_sudoku, generation) = run_evolution(
-        initial_board=test_sudoku,
+        initial_board=INTITIAL_BOARD,
         population=population,
-        mutation_rate=0.05,
-        elitism_rate=10,
-        tournament_members=3,
-        stagnation_limit=70,
+        mutation_rate=MUTATION_RATE,
+        elitism_rate=ELITISM_RATE,
+        tournament_members=TOURNAMENT_MEMBERS,
+        stagnation_limit=STAGNATION_LIMIT,
+        use_parallelization=USE_PARALLELIZATION == "True",
+        gui_mode=GUI,
     )
     now = time.perf_counter()
     print(f"It took {now - then}")
 
 
 if __name__ == "__main__":
-    run_once(10)
+    run_once(SEED)
     # set_mask(test_sudoku)
     # population =  make_initial_population(test_sudoku, 2)
     # print(calculate_population_fitness(population))
