@@ -50,10 +50,10 @@ def run_once(seed: int):
     return run_evolution(
         initial_board=test_sudoku,
         population=population,
-        mutation_rate=0.12,
+        mutation_rate=0.05,
         elitism_rate=10,
         tournament_members=3,
-        stagnation_limit=30,
+        stagnation_limit=40,
     )
 
 
