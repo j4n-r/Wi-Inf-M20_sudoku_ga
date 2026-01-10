@@ -1,10 +1,18 @@
 import multiprocessing as mp
+from time import sleep
+import time
+
+from rich.console import Console
+from rich.live import Live
 from ga import (
+    debug_print,
     make_initial_population,
     run_evolution,
     set_mask,
     set_seed,
 )
+from ui import render_sudoku, update_board
+
 test_sudoku: list[list[int]]= [
         [5, 3, 0, 0, 7, 0, 0, 0, 0],
         [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -16,21 +24,18 @@ test_sudoku: list[list[int]]= [
         [0, 0, 0, 4, 1, 9, 0, 0, 5],
         [0, 0, 0, 0, 8, 0, 0, 7, 9],
     ]
-# SUDOKU: npt.NDArray[np.int8] = np.array(
-#     [
-#         [0, 7, 0, 6, 5, 8, 0, 0, 2],
-#         [0, 0, 1, 0, 4, 3, 0, 0, 8],
-#         [8, 0, 0, 2, 0, 0, 7, 0, 0],
-#         [5, 4, 0, 0, 0, 0, 0, 0, 1],
-#         [0, 2, 0, 0, 0, 5, 3, 0, 0],
-#         [0, 9, 0, 0, 0, 0, 2, 0, 6],
-#         [0, 0, 0, 0, 0, 6, 4, 2, 0],
-#         [0, 8, 6, 0, 0, 0, 0, 0, 5],
-#         [0, 5, 2, 0, 7, 0, 0, 0, 0],
-#     ],
-#     dtype=np.int8,
-# )
 
+test_sudoku2: list[list[int]]= [
+        [0, 7, 0, 6, 5, 8, 0, 0, 2],
+        [0, 0, 1, 0, 4, 3, 0, 0, 8],
+        [8, 0, 0, 2, 0, 0, 7, 0, 0],
+        [5, 4, 0, 0, 0, 0, 0, 0, 1],
+        [0, 2, 0, 0, 0, 5, 3, 0, 0],
+        [0, 9, 0, 0, 0, 0, 2, 0, 6],
+        [0, 0, 0, 0, 0, 6, 4, 2, 0],
+        [0, 8, 6, 0, 0, 0, 0, 0, 5],
+        [0, 5, 2, 0, 7, 0, 0, 0, 0],
+    ]
 
 def run_once(seed: int):
     """Run one GA solve with an isolated RNG/mask per process."""
@@ -46,4 +51,6 @@ def run_once(seed: int):
         stagnation_limit=40,
     )
 
-
+if __name__ == "__main__":
+    set_mask(test_sudoku)
+    population =  make_initial_population(test_sudoku, 2)
