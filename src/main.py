@@ -38,9 +38,10 @@ test_sudoku: list[list[int]] = [
 
 # Program config
 SEED = 10
+USE_SEED = "True"  # "True" or "False"
 USE_PARALLELIZATION = "True" # "True" or "False"
-GUI = "Generations" # "Sudoku", "Generations", or "None"
-RUNS = 1  # number of repeated runs for timing
+GUI = "None" # "Sudoku", "Generations", or "None"
+RUNS = 10  # number of repeated runs for timing
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
@@ -54,7 +55,8 @@ CHUNK_SIZE = 400 # how big the array of sudokus is for the fitness calculation f
 
 def run_once(seed: int) -> float:
     then = time.perf_counter()
-    random.seed(seed)
+    if USE_SEED == "True":
+        random.seed(seed)
     set_mask(INTITIAL_BOARD)
     population = make_initial_population(INTITIAL_BOARD, POPULATION_SIZE)
     (winning_sudoku, generation) = run_evolution(
