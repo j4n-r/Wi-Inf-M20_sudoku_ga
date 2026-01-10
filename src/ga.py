@@ -2,7 +2,7 @@ from __future__ import annotations
 from copy import deepcopy
 import random
 
-from ui import render_sudoku
+from ui import render_sudoku, update_board
 
 
 type SudokuCandidate = list[list[int]]
@@ -10,17 +10,12 @@ type SudokuPopulation = list[SudokuCandidate]
 
 fixed_mask: list[list[bool]] = []
 row_mutable_indices: list[list[int]] = []
-# my_rng = random.
+
 
 def debug_print(sudoku_like: list[list[Any]]):
     for row in sudoku_like:
         print(row)
     print()
-
-
-def set_seed(seed: int):
-    global my_rng
-    pass
 
 
 def set_mask(sudoku: SudokuCandidate):
@@ -41,8 +36,10 @@ def set_mask(sudoku: SudokuCandidate):
         row_mutable_indices.append(mut_row_idx)
 
 
-def make_initial_population(sudoku: SudokuCandidate, population_size: int)  -> SudokuPopulation:
-    missing_numbers : list[list[int]] = []
+def make_initial_population(
+    sudoku: SudokuCandidate, population_size: int
+) -> SudokuPopulation:
+    missing_numbers: list[list[int]] = []
     all_numbers = {1, 2, 3, 4, 5, 6, 7, 8, 9}
     for row in sudoku:
         current = set(row)
@@ -53,24 +50,22 @@ def make_initial_population(sudoku: SudokuCandidate, population_size: int)  -> S
     for _ in range(population_size):
         # Create a fresh copy for this individual
         child = deepcopy(sudoku)
-        
+
         for row_idx in range(9):
             # Get the specific missing numbers for THIS row
             # We copy it because random.shuffle works in-place
-            missing_vals = missing_numbers[row_idx][:] 
+            missing_vals = missing_numbers[row_idx][:]
             random.shuffle(missing_vals)
 
             # Get the locations that need filling for THIS row
             target_indices = row_mutable_indices[row_idx]
-            
+
             # Plug the shuffled numbers into the holes
             for i, col_idx in enumerate(target_indices):
                 child[row_idx][col_idx] = missing_vals[i]
-                
+
         population.append(child)
-        debug_print(child)
     return population
-            
 
 
 def calculate_population_fitness(population: SudokuPopulation) -> list[int]:
@@ -120,7 +115,7 @@ def crossover(parent1: SudokuCandidate, parent2: SudokuCandidate) -> SudokuCandi
     return child
 
 
-def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
+def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> None:
     """
     For each row: with probability mutation_rate, swap two *mutable* cells in that row.
     Fixed cells (givens) are never changed.
@@ -136,12 +131,41 @@ def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> SudokuCandidate:
         c1, c2 = random.sample(mutable_cols, 2)
         sudoku[r][c1], sudoku[r][c2] = sudoku[r][c2], sudoku[r][c1]
 
-    return sudoku
 
-def batch_tournament_winners(
-    fitness_scores: list[int], selection_count: int, tournament_members: int = 3
-) -> list[SudokuCandidate]:
-    pass
+def get_parents_from_tournament(
+    population: SudokuPopulation,
+    fitness_scores: list[int],
+    selection_count: int,
+    tournament_members: int = 3,
+) -> list[list[SudokuCandidate]]:
+    """
+    Select parent pairs using tournament selection.
+    Lower fitness score = better individual.
+    """
+    parent_pairs: list[list[SudokuCandidate]] = []
+    population_size = len(population)
+
+    for _ in range(selection_count):
+        parents: list[SudokuCandidate] = []
+
+        for _ in range(2):  # select two parents
+            # pick random competitors
+            competitors = random.sample(range(population_size), tournament_members)
+
+            # choose the best among them
+            best_index = competitors[0]
+            for idx in competitors[1:]:
+                if fitness_scores[idx] < fitness_scores[best_index]:
+                    best_index = idx
+
+            parents.append(population[best_index])
+
+        parent_pairs.append(parents)
+
+    return parent_pairs
+
+
+from copy import deepcopy
 
 
 def evolve_population(
@@ -149,8 +173,50 @@ def evolve_population(
     fitness_scores: list[int],
     mutation_rate: float,
     elitism_rate: int,
-    tournament_members: int) -> SudokuPopulation:
-    pass
+    tournament_members: int,
+) -> SudokuPopulation:
+    """
+    Create the next generation:
+      1) keep the best 'elitism_rate' individuals
+      2) fill the rest via tournament selection -> crossover -> mutation
+    """
+    pop_size = len(current_pop)
+    elitism_count = min(elitism_rate, pop_size)
+
+    paired: list[tuple[int, SudokuCandidate]] = []
+    for i in range(pop_size):
+        paired.append((fitness_scores[i], current_pop[i]))
+
+    # sort by fitness
+    paired.sort(key=lambda pair: pair[0])
+
+    next_population: SudokuPopulation = []
+    for pair in paired[:elitism_count]:
+        individual = pair[1]
+        # copy sudoku
+        elite = [row[:] for row in individual]
+        # add to new population
+        next_population.append(elite)
+
+    # --- 2) Create the rest of the population ---
+    children_needed = pop_size - elitism_count
+    if children_needed <= 0:
+        return next_population
+
+    parent_pairs = get_parents_from_tournament(
+        population=current_pop,
+        fitness_scores=fitness_scores,
+        selection_count=children_needed,
+        tournament_members=tournament_members,
+    )
+
+    for parent1, parent2 in parent_pairs:
+        child = crossover(parent1, parent2)
+        mutate(child, mutation_rate)
+        next_population.append(child)
+
+    return next_population
+
 
 def run_evolution(
     initial_board: SudokuCandidate,
@@ -159,5 +225,51 @@ def run_evolution(
     elitism_rate: int,
     tournament_members: int,
     stagnation_limit: int = 100,
-) -> int:
-    pass
+):
+    population_size: int = len(population)
+
+    best_fitness_ever: int = 100
+    generations_without_improvement: int = 0
+    generation: int = 0
+    render_sudoku(initial_board)
+
+    while True:
+        fitness_scores = calculate_population_fitness(population)
+        best_fitness_now = min(fitness_scores)
+        best_index = fitness_scores.index(best_fitness_now)
+        best_individual = population[best_index]
+
+        if generation % 10 == 0:
+            # update_board(best_individual)
+            print(f"Best fitness at generation {generation}: {best_fitness_now}")
+
+        # SOLVED
+        if best_fitness_now == 0:
+            print("SOLVED")
+            return best_individual, generation
+
+        # Track if we improved
+        if best_fitness_now < best_fitness_ever:
+            best_fitness_ever = best_fitness_now
+            generations_without_improvement = 0
+        else:
+            # if not track how long we are already on the same fitness level
+            generations_without_improvement += 1
+
+        # if the stagnation limit is reached, reset everything and try agin
+        if generations_without_improvement >= stagnation_limit:
+            population = make_initial_population(initial_board, population_size)
+            best_fitness_ever = 100
+            generations_without_improvement = 0
+            generation = 0
+            continue
+
+        population = evolve_population(
+            population,
+            fitness_scores,
+            mutation_rate,
+            elitism_rate,
+            tournament_members,
+        )
+
+        generation += 1
