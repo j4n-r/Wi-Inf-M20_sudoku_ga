@@ -95,9 +95,12 @@ def calculate_fitness(grid: SudokuCandidate) -> int:
 
 
 def calculate_fitness_parallel(
-    population: SudokuPopulation, ex: ProcessPoolExecutor, chunk_size: int
+    population: SudokuPopulation, worker_pool: ProcessPoolExecutor, chunk_size: int
 ) -> list[int]:
-    return list(ex.map(calculate_fitness, population, chunksize=chunk_size))
+    # split the population into chunks of chunk size
+    # make each worker call calculate_fitness(sudoku) for each sudoku in his chunk
+    # convert the returned iterator to a list
+    return list(worker_pool.map(calculate_fitness, population, chunksize=chunk_size))
 
 
 def calculate_fitness_population(population: SudokuPopulation) -> list[int]:
