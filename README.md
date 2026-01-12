@@ -24,6 +24,15 @@ uv run py-spy  top --subprocesses -- python src/main.py
 ```
 The time is aggregated for all workers running a function
 
+Speedscope 
 
+https://www.speedscope.app/
+``` bash
+uv run py-spy record \
+        --subprocesses \
+        -f speedscope \
+        -o profile.json \
+        -- python src/main.py
+```
 
 

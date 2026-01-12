@@ -6,7 +6,8 @@ Collecting samples from 'python src/main.py' and subprocesses
 Total Samples 300
 GIL: 100.00%, Active: 100.00%, Threads: 1, Processes 1
 
-  %Own   %Total  OwnTime  TotalTime  Function (filename)                                                                                           46.00%  46.00%    1.22s     1.22s   calculate_fitness (ga.py)
+  %Own   %Total  OwnTime  TotalTime  Function (filename)
+ 46.00%  46.00%    1.22s     1.22s   calculate_fitness (ga.py)
  28.00%  28.00%   0.600s    0.600s   _randbelow_with_getrandbits (random.py)
   4.00%  14.00%   0.230s    0.540s   sample (random.py)
   5.00%   5.00%   0.210s    0.230s   __instancecheck__ (<frozen abc>)

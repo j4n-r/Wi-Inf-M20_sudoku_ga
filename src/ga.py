@@ -1,6 +1,7 @@
 from __future__ import annotations
 from copy import deepcopy
 import random
+from typing import Any
 
 from ui import render_sudoku, update_board
 from concurrent.futures import ProcessPoolExecutor
@@ -13,6 +14,8 @@ type SudokuPopulation = list[SudokuCandidate]
 fixed_mask: list[list[bool]] = []
 row_mutable_indices: list[list[int]] = []
 
+GRID_SIZE = 9
+BLOCK_SIZE = 3
 
 def debug_print(sudoku_like: list[list[Any]]):
     for row in sudoku_like:
@@ -53,7 +56,7 @@ def make_initial_population(
         # Create a fresh copy for this individual
         child = deepcopy(sudoku)
 
-        for row_idx in range(9):
+        for row_idx in range(GRID_SIZE):
             # Get the specific missing numbers for THIS row
             # We copy it because random.shuffle works in-place
             missing_vals = missing_numbers[row_idx][:]
@@ -70,32 +73,34 @@ def make_initial_population(
     return population
 
 
-
-def calculate_fitness_for_chunk(grid: SudokuCandidate) -> int:
+def calculate_fitness(grid: SudokuCandidate) -> int:
     # same logic you already used inside calculate_population_fitness
     conflicts = 0
 
     # column conflicts
-    for col in range(9):
-        col_vals = [grid[r][col] for r in range(9)]
-        conflicts += 9 - len(set(col_vals))
+    for col in range(GRID_SIZE):
+        col_vals = [grid[r][col] for r in range(GRID_SIZE)]
+        conflicts += GRID_SIZE - len(set(col_vals))
 
     # box conflicts
-    for br in range(0, 9, 3):
-        for bc in range(0, 9, 3):
+    for br in range(0, GRID_SIZE, BLOCK_SIZE):
+        for bc in range(0, GRID_SIZE, BLOCK_SIZE):
             box = []
-            for r in range(br, br + 3):
-                for c in range(bc, bc + 3):
+            for r in range(br, br + BLOCK_SIZE):
+                for c in range(bc, bc + BLOCK_SIZE):
                     box.append(grid[r][c])
-            conflicts += 9 - len(set(box))
+            conflicts += GRID_SIZE - len(set(box))
 
     return conflicts
 
-def calculate_fitness_parallel(population: SudokuPopulation, ex: ProcessPoolExecutor, chunk_size: int) -> list[int]:
-    return list(ex.map(calculate_fitness_for_chunk, population, chunksize=chunk_size))
+
+def calculate_fitness_parallel(
+    population: SudokuPopulation, ex: ProcessPoolExecutor, chunk_size: int
+) -> list[int]:
+    return list(ex.map(calculate_fitness, population, chunksize=chunk_size))
 
 
-def calculate_fitness(population: SudokuPopulation) -> list[int]:
+def calculate_fitness_population(population: SudokuPopulation) -> list[int]:
     """
     Fitness = number of conflicts in columns and 3x3 boxes.
     Lower is better. 0 means a solved Sudoku.
@@ -103,23 +108,8 @@ def calculate_fitness(population: SudokuPopulation) -> list[int]:
     fitness_scores: list[int] = []
 
     for sudoku in population:
-        conflicts = 0
-
-        # --- column conflicts ---
-        for col in range(9):
-            column_values = [sudoku[row][col] for row in range(9)]
-            conflicts += 9 - len(set(column_values))
-
-        # --- 3x3 box conflicts ---
-        for box_row in range(0, 9, 3):
-            for box_col in range(0, 9, 3):
-                box_values: list[int] = []
-                for r in range(box_row, box_row + 3):
-                    for c in range(box_col, box_col + 3):
-                        box_values.append(sudoku[r][c])
-                conflicts += 9 - len(set(box_values))
-
-        fitness_scores.append(conflicts)
+        score = calculate_fitness(sudoku)
+        fitness_scores.append(score)
     return fitness_scores
 
 
@@ -130,10 +120,10 @@ def crossover(parent1: SudokuCandidate, parent2: SudokuCandidate) -> SudokuCandi
     Pick a cut point, take the top part of rows from parent1 and the rest from parent2.
     This preserves row validity because whole rows are copied.
     """
-    cut = random.randint(1, 9 - 1)  # 1..8 so both parents contribute
+    cut = random.randint(1, GRID_SIZE - 1)  # 1..8 so both parents contribute
 
     child: SudokuCandidate = []
-    for row_idx in range(9):
+    for row_idx in range(GRID_SIZE):
         if row_idx < cut:
             child.append(parent1[row_idx][:])  # copy row
         else:
@@ -147,7 +137,7 @@ def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> None:
     For each row: with probability mutation_rate, swap two *mutable* cells in that row.
     Fixed cells (givens) are never changed.
     """
-    for r in range(9):
+    for r in range(GRID_SIZE):
         if random.random() >= mutation_rate:
             continue
 
@@ -254,7 +244,7 @@ def run_evolution(
     stagnation_limit: int = 100,
     use_parallelization: bool = True,
     gui_mode: str = "Sudoku",
-    chunk_size: int = 256
+    chunk_size: int = 256,
 ):
     population_size: int = len(population)
 
@@ -269,7 +259,9 @@ def run_evolution(
     if show_board:
         render_sudoku(initial_board)
 
-    def report_progress(best_fitness_now: int, best_individual: SudokuCandidate) -> None:
+    def report_progress(
+        best_fitness_now: int, best_individual: SudokuCandidate
+    ) -> None:
         if generation % 10 != 0:
             return
         if show_generations:
@@ -281,9 +273,9 @@ def run_evolution(
             update_board(best_individual)
 
     if use_parallelization:
-        with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
+        with ProcessPoolExecutor(max_workers=os.cpu_count()) as worker_pool:
             while True:
-                fitness_scores = calculate_fitness_parallel(population, ex,chunk_size)
+                fitness_scores = calculate_fitness_parallel(population, worker_pool, chunk_size)
                 best_fitness_now = min(fitness_scores)
                 best_index = fitness_scores.index(best_fitness_now)
                 best_individual = population[best_index]
@@ -323,7 +315,7 @@ def run_evolution(
                 global_generations += 1
     else:
         while True:
-            fitness_scores = calculate_fitness(population)
+            fitness_scores = calculate_fitness_population(population)
             best_fitness_now = min(fitness_scores)
             best_index = fitness_scores.index(best_fitness_now)
             best_individual = population[best_index]
