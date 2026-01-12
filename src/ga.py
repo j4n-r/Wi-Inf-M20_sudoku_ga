@@ -8,6 +8,10 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 
 
+class SudokuException(Exception):
+    pass
+
+
 type SudokuCandidate = list[list[int]]
 type SudokuPopulation = list[SudokuCandidate]
 
@@ -17,10 +21,63 @@ row_mutable_indices: list[list[int]] = []
 GRID_SIZE = 9
 BLOCK_SIZE = 3
 
+
 def debug_print(sudoku_like: list[list[Any]]):
     for row in sudoku_like:
         print(row)
     print()
+
+
+def validate_sudoku(sudoku: SudokuCandidate) -> None:
+    """
+    Raises exception
+    """
+    # check number of rows
+    if len(sudoku) != GRID_SIZE:
+        raise SudokuException(f"Sudoku does not have exactly {GRID_SIZE} rows")
+
+    for row_idx, row in enumerate(sudoku):
+        # check row length
+        if len(row) != GRID_SIZE:
+            raise SudokuException(f"Sudoku row {row_idx} width is not {GRID_SIZE}")
+
+        for col_idx, value in enumerate(row):
+            # check for non int values
+            if not isinstance(value, int):
+                raise SudokuException(
+                    f"Sudoku value at ({row_idx}, {col_idx}) is not an int"
+                )
+            # check for > then GRID_SIZE values
+            if value < 0 or value > GRID_SIZE:
+                raise SudokuException(
+                    f"Sudoku value at (row: {row_idx}, col: {col_idx}) is out of range"
+                )
+
+        # get all non_zero values in a row
+        non_zero = [value for value in row if value != 0]
+        # compare the list with a set (only unique numbers allowed) to check for duplicates
+        if len(non_zero) != len(set(non_zero)):
+            raise SudokuException(f"Sudoku row {row_idx} has duplicates")
+
+    # check for column duplicates
+    for col_idx in range(GRID_SIZE):
+        column = [sudoku[row_idx][col_idx] for row_idx in range(GRID_SIZE)]
+        non_zero = [value for value in column if value != 0]
+        if len(non_zero) != len(set(non_zero)):
+            raise SudokuException(f"Sudoku column {col_idx} has duplicates")
+
+    # check for block duplicates
+    for block_row in range(0, GRID_SIZE, BLOCK_SIZE):
+        for block_col in range(0, GRID_SIZE, BLOCK_SIZE):
+            block_vals: list[int] = []
+            for row in range(block_row, block_row + BLOCK_SIZE):
+                for col in range(block_col, block_col + BLOCK_SIZE):
+                    block_vals.append(sudoku[row][col])
+            non_zero = [value for value in block_vals if value != 0]
+            if len(non_zero) != len(set(non_zero)):
+                raise SudokuException(
+                    f"Sudoku block at (row: {block_row}, col: {block_col}) has duplicates"
+                )
 
 
 def set_mask(sudoku: SudokuCandidate):
@@ -82,12 +139,12 @@ def calculate_fitness(grid: SudokuCandidate) -> int:
         col_vals = [grid[r][col] for r in range(GRID_SIZE)]
         conflicts += GRID_SIZE - len(set(col_vals))
 
-    # box conflicts
-    for br in range(0, GRID_SIZE, BLOCK_SIZE):
-        for bc in range(0, GRID_SIZE, BLOCK_SIZE):
+    # block conflicts
+    for block_row in range(0, GRID_SIZE, BLOCK_SIZE):
+        for block_col in range(0, GRID_SIZE, BLOCK_SIZE):
             box = []
-            for r in range(br, br + BLOCK_SIZE):
-                for c in range(bc, bc + BLOCK_SIZE):
+            for r in range(block_row, block_row + BLOCK_SIZE):
+                for c in range(block_col, block_col + BLOCK_SIZE):
                     box.append(grid[r][c])
             conflicts += GRID_SIZE - len(set(box))
 
@@ -185,9 +242,6 @@ def get_parents_from_tournament(
     return parent_pairs
 
 
-from copy import deepcopy
-
-
 def evolve_population(
     current_pop: SudokuPopulation,
     fitness_scores: list[int],
@@ -278,7 +332,9 @@ def run_evolution(
     if use_parallelization:
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as worker_pool:
             while True:
-                fitness_scores = calculate_fitness_parallel(population, worker_pool, chunk_size)
+                fitness_scores = calculate_fitness_parallel(
+                    population, worker_pool, chunk_size
+                )
                 best_fitness_now = min(fitness_scores)
                 best_index = fitness_scores.index(best_fitness_now)
                 best_individual = population[best_index]

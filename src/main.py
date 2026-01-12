@@ -2,9 +2,11 @@ from __future__ import annotations
 import random
 import time
 from ga import (
+    SudokuException,
     make_initial_population,
     run_evolution,
     set_mask,
+    validate_sudoku,
 )
 
 test_sudoku: list[list[int]] = [
@@ -39,24 +41,32 @@ test_sudoku: list[list[int]] = [
 # Program config
 SEED = 10
 USE_SEED = "True"  # "True" or "False"
-USE_PARALLELIZATION = "True" # "True" or "False"
-GUI = "None" # "Sudoku", "Generations", or "None"
-RUNS = 10  # number of repeated runs for timing
+USE_PARALLELIZATION = "True"  # "True" or "False"
+GUI = "Generations"  # "Sudoku", "Generations", or "None"
+RUNS = 1  # number of repeated runs for timing
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
 POPULATION_SIZE = 8000
 MUTATION_RATE = 0.05
-ELITISM_RATE = 10 
+ELITISM_RATE = 10
 TOURNAMENT_MEMBERS = 3
 STAGNATION_LIMIT = 70
-CHUNK_SIZE = 400 # how big the array of sudokus is for the fitness calculation for each worker
+CHUNK_SIZE = (
+    400  # how big the array of sudokus is for the fitness calculation for each worker
+)
 
 
 def run_once(seed: int) -> float:
     then = time.perf_counter()
     if USE_SEED == "True":
         random.seed(seed)
+    try:
+        validate_sudoku(INTITIAL_BOARD)
+    except SudokuException as e:
+        print(e)
+        exit(1)
+
     set_mask(INTITIAL_BOARD)
     population = make_initial_population(INTITIAL_BOARD, POPULATION_SIZE)
     (winning_sudoku, generation) = run_evolution(
@@ -68,7 +78,7 @@ def run_once(seed: int) -> float:
         stagnation_limit=STAGNATION_LIMIT,
         use_parallelization=USE_PARALLELIZATION == "True",
         gui_mode=GUI,
-        chunk_size=CHUNK_SIZE
+        chunk_size=CHUNK_SIZE,
     )
     now = time.perf_counter()
     elapsed = now - then
