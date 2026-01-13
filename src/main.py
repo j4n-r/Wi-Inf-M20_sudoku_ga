@@ -110,24 +110,18 @@ def validate_sudoku(sudoku: SudokuCandidate) -> None:
                 )
 
 
-def set_mask(sudoku: SudokuCandidate) -> tuple[list[list[bool]], list[list[int]]]:
+def calculate_mutable_indices(sudoku: SudokuCandidate) -> list[list[int]]:
     """
     Cache mutable cell positions to avoid recomputing them inside hot loops.
     """
-    fixed_mask: list[list[bool]] = []
     row_mutable_indices: list[list[int]] = []
     for row in sudoku:
-        mask_row: list[bool] = []
         mut_row_idx: list[int] = []
         for cell_idx, num in enumerate(row):
             if num == 0:
-                mask_row.append(False)
                 mut_row_idx.append(cell_idx)
-            else:
-                mask_row.append(True)
-        fixed_mask.append(mask_row)
         row_mutable_indices.append(mut_row_idx)
-    return fixed_mask, row_mutable_indices
+    return row_mutable_indices
 
 
 def run_once(seed: int) -> float:
@@ -140,7 +134,7 @@ def run_once(seed: int) -> float:
         print(e)
         exit(1)
 
-    fixed_mask, row_mutable_indices = set_mask(INTITIAL_BOARD)
+    row_mutable_indices = calculate_mutable_indices(INTITIAL_BOARD)
     population = make_initial_population(
         INTITIAL_BOARD, POPULATION_SIZE, row_mutable_indices
     )
@@ -150,7 +144,6 @@ def run_once(seed: int) -> float:
         mutation_rate=MUTATION_RATE,
         elitism_rate=ELITISM_RATE,
         tournament_members=TOURNAMENT_MEMBERS,
-        fixed_mask=fixed_mask,
         row_mutable_indices=row_mutable_indices,
         stagnation_limit=STAGNATION_LIMIT,
         use_parallelization=USE_PARALLELIZATION == "True",

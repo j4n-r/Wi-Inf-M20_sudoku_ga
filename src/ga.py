@@ -259,28 +259,31 @@ def evolve_population(
     return next_population
 
 
-def evolve_subpopulation(args: tuple[Any, ...]) -> SudokuPopulation:
+def make_children_wrapper(args: tuple[Any, ...]) -> SudokuPopulation:
     (
-        subpopulation,
-        subfitness,
-        mutation_rate,
-        elitism_rate,
+        population,
+        fitness_scores,
         tournament_members,
+        children_needed,
+        mutation_rate,
         row_mutable,
         seed,
     ) = args
-    return evolve_population(
-        current_population=subpopulation,
-        fitness_scores=subfitness,
-        mutation_rate=mutation_rate,
-        elitism_rate=elitism_rate,
+    random.seed(seed)
+    return make_children(
+        population=population,
+        fitness_scores=fitness_scores,
         tournament_size=tournament_members,
+        children_needed=children_needed,
+        mutation_rate=mutation_rate,
         row_mutable_indices=row_mutable,
-        seed=seed,
     )
 
 
 def split_into_chunks(items: list[Any], chunk_count: int) -> list[list[Any]]:
+    """
+    Split a list into chunk_count chunks
+    """
     if chunk_count <= 1 or len(items) <= 1:
         return [items]
     chunk_count = min(chunk_count, len(items))
@@ -296,6 +299,19 @@ def split_into_chunks(items: list[Any], chunk_count: int) -> list[list[Any]]:
     return chunks
 
 
+def split_counts(total: int, chunk_count: int) -> list[int]:
+    """
+    Distributes a total value into a fixed number of chunks as evenly as possible.
+    Example: 10 into 3 chunks becomes [4, 3, 3].
+    """
+    if total <= 0:
+        return []
+    chunk_count = min(chunk_count, total)
+    base = total // chunk_count
+    extra = total % chunk_count
+    return [base + (1 if i < extra else 0) for i in range(chunk_count)]
+
+
 def evolve_population_parallel(
     current_population: SudokuPopulation,
     fitness_scores: list[int],
@@ -307,29 +323,36 @@ def evolve_population_parallel(
     worker_count: int,
     seed: int,
 ) -> SudokuPopulation:
-    # make seed for each worker, since they will spawn in new processes
-    worker_seeds = [seed + i for i in range(worker_count)]
+    pop_size = len(current_population)
+    elites, elitism_count = get_elites(current_population, fitness_scores, elitism_rate)
+    next_population: SudokuPopulation = []
+    next_population.extend(elites)
+
+    children_needed = pop_size - elitism_count
+    if children_needed <= 0:
+        return next_population
+
     population_chunks = split_into_chunks(current_population, worker_count)
     fitness_chunks = split_into_chunks(fitness_scores, worker_count)
-    # make a list of arguments for the workers
-    args = [
-        (
-            population_chunks[i],
-            fitness_chunks[i],
-            mutation_rate,
-            elitism_rate,
-            tournament_members,
-            row_mutable_indices,
-            worker_seeds[i],
+    children_per_worker = split_counts(children_needed, len(population_chunks))
+    worker_seeds = [seed + i for i in range(len(population_chunks))]
+    args = []
+    for i in range(len(population_chunks)):
+        if children_per_worker[i] <= 0:
+            continue
+        args.append(
+            (
+                population_chunks[i],
+                fitness_chunks[i],
+                tournament_members,
+                children_per_worker[i],
+                mutation_rate,
+                row_mutable_indices,
+                worker_seeds[i],
+            )
         )
-        for i in range(len(population_chunks))
-    ]
-    # call evolve_subpopulation for each chunk using the workers (worker_pool)
-    next_chunks = list(worker_pool.map(evolve_subpopulation, args))
-    next_population: SudokuPopulation = []
-    # put the new population togeather
+    next_chunks = list(worker_pool.map(make_children_wrapper, args))
     for chunk in next_chunks:
-        # like list.append() but from an iterable
         next_population.extend(chunk)
 
     random.shuffle(next_population)
@@ -342,7 +365,6 @@ def run_evolution(
     mutation_rate: float,
     elitism_rate: int,
     tournament_members: int,
-    fixed_mask: list[list[bool]],
     row_mutable_indices: list[list[int]],
     seed: int,
     stagnation_limit: int = 100,
