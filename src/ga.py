@@ -260,6 +260,11 @@ def evolve_population(
 
 
 def make_children_wrapper(args: tuple[Any, ...]) -> SudokuPopulation:
+    """
+    Wrapper, since we have to pass the args as tuple to the workers       |
+                                                                          V
+        Here: next_chunks = list(worker_pool.map(make_children_wrapper, args))
+    """
     (
         population,
         fitness_scores,
@@ -299,7 +304,7 @@ def split_into_chunks(items: list[Any], chunk_count: int) -> list[list[Any]]:
     return chunks
 
 
-def split_counts(total: int, chunk_count: int) -> list[int]:
+def balanced_split(total: int, chunk_count: int) -> list[int]:
     """
     Distributes a total value into a fixed number of chunks as evenly as possible.
     Example: 10 into 3 chunks becomes [4, 3, 3].
@@ -324,8 +329,10 @@ def evolve_population_parallel(
     seed: int,
 ) -> SudokuPopulation:
     pop_size = len(current_population)
+    # get the elites from the whole population
     elites, elitism_count = get_elites(current_population, fitness_scores, elitism_rate)
     next_population: SudokuPopulation = []
+    # put them directly into the next one
     next_population.extend(elites)
 
     children_needed = pop_size - elitism_count
@@ -334,9 +341,12 @@ def evolve_population_parallel(
 
     population_chunks = split_into_chunks(current_population, worker_count)
     fitness_chunks = split_into_chunks(fitness_scores, worker_count)
-    children_per_worker = split_counts(children_needed, len(population_chunks))
+    # how many children each worker should make
+    children_per_worker = balanced_split(children_needed, len(population_chunks))
+    # new seeds for each subprocess
     worker_seeds = [seed + i for i in range(len(population_chunks))]
     args = []
+    # make a seperate argument list for each chunk
     for i in range(len(population_chunks)):
         if children_per_worker[i] <= 0:
             continue
@@ -351,10 +361,15 @@ def evolve_population_parallel(
                 worker_seeds[i],
             )
         )
+    # make childrens for next population with workers
+    # the parents can only be from the subpopulation
     next_chunks = list(worker_pool.map(make_children_wrapper, args))
+    # add the children to the next_population
     for chunk in next_chunks:
         next_population.extend(chunk)
 
+    # shuffle the population, so that next time the childrens in one subpopulation
+    # do not have the same parents
     random.shuffle(next_population)
     return next_population
 
@@ -400,6 +415,7 @@ def run_evolution(
 
     worker_pool = None
     worker_count = 1
+    # make worker pool if use_parallelization is True
     if use_parallelization:
         worker_count = os.cpu_count() or 1
         worker_pool = ProcessPoolExecutor(max_workers=worker_count)
