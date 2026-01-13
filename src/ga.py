@@ -279,98 +279,62 @@ def run_evolution(
             return
         if show_generations:
             print(
-                "Best fitness at generation "
+                "Best fitness at generation " + 
                 f"{generation}: {best_fitness_now} --- Global Generation {global_generations}"
             )
         if show_board:
             update_board(best_individual)
 
+    worker_pool = None
     if use_parallelization:
-        with ProcessPoolExecutor(max_workers=os.cpu_count()) as worker_pool:
-            while True:
-                fitness_scores = calculate_fitness_parallel(
-                    population, worker_pool, chunk_size
-                )
-                best_fitness_now = min(fitness_scores)
-                best_index = fitness_scores.index(best_fitness_now)
-                best_individual = population[best_index]
-
-                report_progress(best_fitness_now, best_individual)
-
-                # SOLVED
-                if best_fitness_now == 0:
-                    print(f"SOLVED in Generation: {global_generations}")
-                    return best_individual, generation
-
-                # Track if we improved
-                if best_fitness_now < best_fitness_ever:
-                    best_fitness_ever = best_fitness_now
-                    generations_without_improvement = 0
-                else:
-                    # if not track how long we are already on the same fitness level
-                    generations_without_improvement += 1
-
-                # if the stagnation limit is reached, reset everything and try agin
-                if generations_without_improvement >= stagnation_limit:
-                    population = make_initial_population(
-                        initial_board, population_size, row_mutable_indices
-                    )
-                    best_fitness_ever = 100
-                    generations_without_improvement = 0
-                    generation = 0
-                    continue
-
-                population = evolve_population(
-                    population,
-                    fitness_scores,
-                    mutation_rate,
-                    elitism_rate,
-                    tournament_members,
-                    row_mutable_indices,
-                )
-
-                generation += 1
-                global_generations += 1
-    else:
-        while True:
+        worker_pool = ProcessPoolExecutor(max_workers=os.cpu_count())
+    while True:
+        if worker_pool is None:
             fitness_scores = calculate_fitness_population(population)
-            best_fitness_now = min(fitness_scores)
-            best_index = fitness_scores.index(best_fitness_now)
-            best_individual = population[best_index]
-
-            report_progress(best_fitness_now, best_individual)
-
-            # SOLVED
-            if best_fitness_now == 0:
-                print(f"SOLVED in Generation: {global_generations}")
-                return best_individual, generation
-
-            # Track if we improved
-            if best_fitness_now < best_fitness_ever:
-                best_fitness_ever = best_fitness_now
-                generations_without_improvement = 0
-            else:
-                # if not track how long we are already on the same fitness level
-                generations_without_improvement += 1
-
-            # if the stagnation limit is reached, reset everything and try agin
-            if generations_without_improvement >= stagnation_limit:
-                population = make_initial_population(
-                    initial_board, population_size, row_mutable_indices
-                )
-                best_fitness_ever = 100
-                generations_without_improvement = 0
-                generation = 0
-                continue
-
-            population = evolve_population(
-                population,
-                fitness_scores,
-                mutation_rate,
-                elitism_rate,
-                tournament_members,
-                row_mutable_indices,
+        else:
+            fitness_scores = calculate_fitness_parallel(
+                population, worker_pool, chunk_size
             )
+        best_fitness_now = min(fitness_scores)
+        best_index = fitness_scores.index(best_fitness_now)
+        best_individual = population[best_index]
 
-            generation += 1
-            global_generations += 1
+        report_progress(best_fitness_now, best_individual)
+
+        # SOLVED
+        if best_fitness_now == 0:
+            print(f"SOLVED in Generation: {global_generations}")
+            # we could remove this, the OS will kill it anyways
+            if worker_pool is not None:
+                worker_pool.shutdown()
+            return best_individual, generation
+
+        # Track if we improved
+        if best_fitness_now < best_fitness_ever:
+            best_fitness_ever = best_fitness_now
+            generations_without_improvement = 0
+        else:
+            # if not track how long we are already on the same fitness level
+            generations_without_improvement += 1
+
+        # if the stagnation limit is reached, reset everything and try agin
+        if generations_without_improvement >= stagnation_limit:
+            population = make_initial_population(
+                initial_board, population_size, row_mutable_indices
+            )
+            best_fitness_ever = 100
+            generations_without_improvement = 0
+            generation = 0
+            continue
+
+        population = evolve_population(
+            population,
+            fitness_scores,
+            mutation_rate,
+            elitism_rate,
+            tournament_members,
+            row_mutable_indices,
+        )
+
+        generation += 1
+        global_generations += 1
