@@ -42,7 +42,7 @@ test_sudoku: list[list[int]] = [
 # Program config
 SEED = 11
 USE_SEED = "True"  # "True" or "False"
-USE_PARALLELIZATION = "True"  # "True" or "False"
+USE_PARALLELIZATION = "False"  # "True" or "False"
 GUI = "Generations"  # "Sudoku", "Generations", or "None"
 RUNS = 1  # number of repeated runs for timing
 
@@ -56,6 +56,7 @@ STAGNATION_LIMIT = 70
 CHUNK_SIZE = (
     400  # how big the array of sudokus is for the fitness calculation for each worker
 )
+
 
 def validate_sudoku(sudoku: SudokuCandidate) -> None:
     """
@@ -108,6 +109,7 @@ def validate_sudoku(sudoku: SudokuCandidate) -> None:
                     f"Sudoku block at (row: {block_row}, col: {block_col}) has duplicates"
                 )
 
+
 def set_mask(sudoku: SudokuCandidate) -> tuple[list[list[bool]], list[list[int]]]:
     """
     Cache mutable cell positions to avoid recomputing them inside hot loops.
@@ -154,7 +156,7 @@ def run_once(seed: int) -> float:
         use_parallelization=USE_PARALLELIZATION == "True",
         gui_mode=GUI,
         chunk_size=CHUNK_SIZE,
-        seed=seed
+        seed=seed,
     )
     now = time.perf_counter()
     elapsed = now - then
@@ -169,6 +171,3 @@ if __name__ == "__main__":
     if RUNS > 1:
         average = sum(timings) / RUNS
         print(f"Average over {RUNS} runs: {average}")
-
-
-

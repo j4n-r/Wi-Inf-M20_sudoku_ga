@@ -12,13 +12,13 @@ test_sudoku: list[list[int]] = [
 
 # Program config
 SEED = 10
-USE_PARALLELIZATION = "True" # "True" or "False"
-GUI = "Generations" # "Sudoku" or "Generations" 
+USE_PARALLELIZATION = "True"  # "True" or "False"
+GUI = "Generations"  # "Sudoku" or "Generations"
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
 POPULATION_SIZE = 8000
 MUTATION_RATE = 0.05
-ELITISM_RATE = 10 
+ELITISM_RATE = 10
 TOURNAMENT_MEMBERS = 3
 STAGNATION_LIMIT = 70
