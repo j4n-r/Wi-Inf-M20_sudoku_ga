@@ -15,9 +15,6 @@ class SudokuException(Exception):
 type SudokuCandidate = list[list[int]]
 type SudokuPopulation = list[SudokuCandidate]
 
-fixed_mask: list[list[bool]] = []
-row_mutable_indices: list[list[int]] = []
-
 GRID_SIZE = 9
 BLOCK_SIZE = 3
 
@@ -28,63 +25,12 @@ def debug_print(sudoku_like: list[list[Any]]):
     print()
 
 
-def validate_sudoku(sudoku: SudokuCandidate) -> None:
-    """
-    Raises exception
-    """
-    # check number of rows
-    if len(sudoku) != GRID_SIZE:
-        raise SudokuException(f"Sudoku does not have exactly {GRID_SIZE} rows")
-
-    for row_idx, row in enumerate(sudoku):
-        # check row length
-        if len(row) != GRID_SIZE:
-            raise SudokuException(f"Sudoku row {row_idx} width is not {GRID_SIZE}")
-
-        for col_idx, value in enumerate(row):
-            # check for non int values
-            if not isinstance(value, int):
-                raise SudokuException(
-                    f"Sudoku value at ({row_idx}, {col_idx}) is not an int"
-                )
-            # check for > then GRID_SIZE values
-            if value < 0 or value > GRID_SIZE:
-                raise SudokuException(
-                    f"Sudoku value at (row: {row_idx}, col: {col_idx}) is out of range"
-                )
-
-        # get all non_zero values in a row
-        non_zero = [value for value in row if value != 0]
-        # compare the list with a set (only unique numbers allowed) to check for duplicates
-        if len(non_zero) != len(set(non_zero)):
-            raise SudokuException(f"Sudoku row {row_idx} has duplicates")
-
-    # check for column duplicates
-    for col_idx in range(GRID_SIZE):
-        column = [sudoku[row_idx][col_idx] for row_idx in range(GRID_SIZE)]
-        non_zero = [value for value in column if value != 0]
-        if len(non_zero) != len(set(non_zero)):
-            raise SudokuException(f"Sudoku column {col_idx} has duplicates")
-
-    # check for block duplicates
-    for block_row in range(0, GRID_SIZE, BLOCK_SIZE):
-        for block_col in range(0, GRID_SIZE, BLOCK_SIZE):
-            block_vals: list[int] = []
-            for row in range(block_row, block_row + BLOCK_SIZE):
-                for col in range(block_col, block_col + BLOCK_SIZE):
-                    block_vals.append(sudoku[row][col])
-            non_zero = [value for value in block_vals if value != 0]
-            if len(non_zero) != len(set(non_zero)):
-                raise SudokuException(
-                    f"Sudoku block at (row: {block_row}, col: {block_col}) has duplicates"
-                )
-
-
-def set_mask(sudoku: SudokuCandidate):
+def set_mask(sudoku: SudokuCandidate) -> tuple[list[list[bool]], list[list[int]]]:
     """
     Cache mutable cell positions to avoid recomputing them inside hot loops.
     """
-    global fixed_mask, row_mutable_indices
+    fixed_mask: list[list[bool]] = []
+    row_mutable_indices: list[list[int]] = []
     for row in sudoku:
         mask_row: list[bool] = []
         mut_row_idx: list[int] = []
@@ -96,10 +42,13 @@ def set_mask(sudoku: SudokuCandidate):
                 mask_row.append(True)
         fixed_mask.append(mask_row)
         row_mutable_indices.append(mut_row_idx)
+    return fixed_mask, row_mutable_indices
 
 
 def make_initial_population(
-    sudoku: SudokuCandidate, population_size: int
+    sudoku: SudokuCandidate,
+    population_size: int,
+    row_mutable_indices: list[list[int]],
 ) -> SudokuPopulation:
     missing_numbers: list[list[int]] = []
     all_numbers = {1, 2, 3, 4, 5, 6, 7, 8, 9}
@@ -192,7 +141,11 @@ def crossover(parent1: SudokuCandidate, parent2: SudokuCandidate) -> SudokuCandi
     return child
 
 
-def mutate(sudoku: SudokuCandidate, mutation_rate: float) -> None:
+def mutate(
+    sudoku: SudokuCandidate,
+    mutation_rate: float,
+    row_mutable_indices: list[list[int]],
+) -> None:
     """
     For each row: with probability mutation_rate, swap two *mutable* cells in that row.
     Fixed cells (givens) are never changed.
@@ -248,6 +201,7 @@ def evolve_population(
     mutation_rate: float,
     elitism_rate: int,
     tournament_members: int,
+    row_mutable_indices: list[list[int]],
 ) -> SudokuPopulation:
     """
     Create the next generation:
@@ -286,7 +240,7 @@ def evolve_population(
 
     for parent1, parent2 in parent_pairs:
         child = crossover(parent1, parent2)
-        mutate(child, mutation_rate)
+        mutate(child, mutation_rate, row_mutable_indices)
         next_population.append(child)
 
     return next_population
@@ -298,6 +252,8 @@ def run_evolution(
     mutation_rate: float,
     elitism_rate: int,
     tournament_members: int,
+    fixed_mask: list[list[bool]],
+    row_mutable_indices: list[list[int]],
     stagnation_limit: int = 100,
     use_parallelization: bool = True,
     gui_mode: str = "Sudoku",
@@ -356,7 +312,9 @@ def run_evolution(
 
                 # if the stagnation limit is reached, reset everything and try agin
                 if generations_without_improvement >= stagnation_limit:
-                    population = make_initial_population(initial_board, population_size)
+                    population = make_initial_population(
+                        initial_board, population_size, row_mutable_indices
+                    )
                     best_fitness_ever = 100
                     generations_without_improvement = 0
                     generation = 0
@@ -368,6 +326,7 @@ def run_evolution(
                     mutation_rate,
                     elitism_rate,
                     tournament_members,
+                    row_mutable_indices,
                 )
 
                 generation += 1
@@ -396,7 +355,9 @@ def run_evolution(
 
             # if the stagnation limit is reached, reset everything and try agin
             if generations_without_improvement >= stagnation_limit:
-                population = make_initial_population(initial_board, population_size)
+                population = make_initial_population(
+                    initial_board, population_size, row_mutable_indices
+                )
                 best_fitness_ever = 100
                 generations_without_improvement = 0
                 generation = 0
@@ -408,6 +369,7 @@ def run_evolution(
                 mutation_rate,
                 elitism_rate,
                 tournament_members,
+                row_mutable_indices,
             )
 
             generation += 1
