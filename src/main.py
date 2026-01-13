@@ -8,7 +8,6 @@ from ga import (
     SudokuException,
     make_initial_population,
     run_evolution,
-    set_mask,
 )
 
 test_sudoku: list[list[int]] = [
@@ -41,7 +40,7 @@ test_sudoku: list[list[int]] = [
 ###########
 
 # Program config
-SEED = 10
+SEED = 11
 USE_SEED = "True"  # "True" or "False"
 USE_PARALLELIZATION = "True"  # "True" or "False"
 GUI = "Generations"  # "Sudoku", "Generations", or "None"
@@ -50,7 +49,7 @@ RUNS = 1  # number of repeated runs for timing
 # Parameters
 INTITIAL_BOARD = test_sudoku
 POPULATION_SIZE = 8000
-MUTATION_RATE = 0.05
+MUTATION_RATE = 0.10
 ELITISM_RATE = 10
 TOURNAMENT_MEMBERS = 3
 STAGNATION_LIMIT = 70
@@ -109,6 +108,25 @@ def validate_sudoku(sudoku: SudokuCandidate) -> None:
                     f"Sudoku block at (row: {block_row}, col: {block_col}) has duplicates"
                 )
 
+def set_mask(sudoku: SudokuCandidate) -> tuple[list[list[bool]], list[list[int]]]:
+    """
+    Cache mutable cell positions to avoid recomputing them inside hot loops.
+    """
+    fixed_mask: list[list[bool]] = []
+    row_mutable_indices: list[list[int]] = []
+    for row in sudoku:
+        mask_row: list[bool] = []
+        mut_row_idx: list[int] = []
+        for cell_idx, num in enumerate(row):
+            if num == 0:
+                mask_row.append(False)
+                mut_row_idx.append(cell_idx)
+            else:
+                mask_row.append(True)
+        fixed_mask.append(mask_row)
+        row_mutable_indices.append(mut_row_idx)
+    return fixed_mask, row_mutable_indices
+
 
 def run_once(seed: int) -> float:
     then = time.perf_counter()
@@ -136,6 +154,7 @@ def run_once(seed: int) -> float:
         use_parallelization=USE_PARALLELIZATION == "True",
         gui_mode=GUI,
         chunk_size=CHUNK_SIZE,
+        seed=seed
     )
     now = time.perf_counter()
     elapsed = now - then

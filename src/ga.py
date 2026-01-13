@@ -24,27 +24,6 @@ def debug_print(sudoku_like: list[list[Any]]):
         print(row)
     print()
 
-
-def set_mask(sudoku: SudokuCandidate) -> tuple[list[list[bool]], list[list[int]]]:
-    """
-    Cache mutable cell positions to avoid recomputing them inside hot loops.
-    """
-    fixed_mask: list[list[bool]] = []
-    row_mutable_indices: list[list[int]] = []
-    for row in sudoku:
-        mask_row: list[bool] = []
-        mut_row_idx: list[int] = []
-        for cell_idx, num in enumerate(row):
-            if num == 0:
-                mask_row.append(False)
-                mut_row_idx.append(cell_idx)
-            else:
-                mask_row.append(True)
-        fixed_mask.append(mask_row)
-        row_mutable_indices.append(mut_row_idx)
-    return fixed_mask, row_mutable_indices
-
-
 def make_initial_population(
     sudoku: SudokuCandidate,
     population_size: int,
@@ -196,24 +175,26 @@ def get_parents_from_tournament(
 
 
 def evolve_population(
-    current_pop: SudokuPopulation,
+    current_population: SudokuPopulation,
     fitness_scores: list[int],
     mutation_rate: float,
     elitism_rate: int,
     tournament_members: int,
     row_mutable_indices: list[list[int]],
+    seed: int
 ) -> SudokuPopulation:
     """
     Create the next generation:
       1) keep the best 'elitism_rate' individuals
       2) fill the rest via tournament selection -> crossover -> mutation
     """
-    pop_size = len(current_pop)
+    random.seed(seed)
+    pop_size = len(current_population)
     elitism_count = min(elitism_rate, pop_size)
 
     paired: list[tuple[int, SudokuCandidate]] = []
     for i in range(pop_size):
-        paired.append((fitness_scores[i], current_pop[i]))
+        paired.append((fitness_scores[i], current_population[i]))
 
     # sort by fitness
     paired.sort(key=lambda pair: pair[0])
@@ -232,7 +213,7 @@ def evolve_population(
         return next_population
 
     parent_pairs = get_parents_from_tournament(
-        population=current_pop,
+        population=current_population,
         fitness_scores=fitness_scores,
         selection_count=children_needed,
         tournament_members=tournament_members,
@@ -246,6 +227,75 @@ def evolve_population(
     return next_population
 
 
+def evolve_subpopulation(args: tuple[Any, ...]) -> SudokuPopulation:
+    subpopulation, subfitness, mutation_rate, elitism_rate, tournament_members, row_mutable, seed = (
+        args
+    )
+    return evolve_population(
+        current_population=subpopulation,
+        fitness_scores=subfitness,
+        mutation_rate=mutation_rate,
+        elitism_rate=elitism_rate,
+        tournament_members=tournament_members,
+        row_mutable_indices=row_mutable,
+        seed=seed
+    )
+
+
+def split_into_chunks(items: list[Any], chunk_count: int) -> list[list[Any]]:
+    if chunk_count <= 1 or len(items) <= 1:
+        return [items]
+    chunk_count = min(chunk_count, len(items))
+    base = len(items) // chunk_count
+    extra = len(items) % chunk_count
+    chunks: list[list[Any]] = []
+    start = 0
+    for i in range(chunk_count):
+        size = base + (1 if i < extra else 0)
+        end = start + size
+        chunks.append(items[start:end])
+        start = end
+    return chunks
+
+
+def evolve_population_parallel(
+    current_population: SudokuPopulation,
+    fitness_scores: list[int],
+    mutation_rate: float,
+    elitism_rate: int,
+    tournament_members: int,
+    row_mutable_indices: list[list[int]],
+    worker_pool: ProcessPoolExecutor,
+    worker_count: int,
+    seed: int
+) -> SudokuPopulation:
+    # make seed for each worker, since they will spawn in new processes
+    worker_seeds = [seed + i for i in range(worker_count)]
+    population_chunks = split_into_chunks(current_population, worker_count)
+    fitness_chunks = split_into_chunks(fitness_scores, worker_count)
+    # make a list of arguments for the workers
+    args = [
+        (
+            population_chunks[i],
+            fitness_chunks[i],
+            mutation_rate,
+            elitism_rate,
+            tournament_members,
+            row_mutable_indices,
+            worker_seeds[i]
+        )
+        for i in range(len(population_chunks))
+    ]
+    # call evolve_subpopulation for each chunk using the workers (worker_pool)
+    next_chunks = list(worker_pool.map(evolve_subpopulation, args))
+    next_population: SudokuPopulation = []
+    # put the new population togeather
+    for chunk in next_chunks:
+        # like list.append() but from an iterable
+        next_population.extend(chunk)
+    return next_population
+
+
 def run_evolution(
     initial_board: SudokuCandidate,
     population: SudokuPopulation,
@@ -254,6 +304,7 @@ def run_evolution(
     tournament_members: int,
     fixed_mask: list[list[bool]],
     row_mutable_indices: list[list[int]],
+    seed: int,
     stagnation_limit: int = 100,
     use_parallelization: bool = True,
     gui_mode: str = "Sudoku",
@@ -286,8 +337,14 @@ def run_evolution(
             update_board(best_individual)
 
     worker_pool = None
+    worker_count = 1
     if use_parallelization:
-        worker_pool = ProcessPoolExecutor(max_workers=os.cpu_count())
+        worker_count = os.cpu_count() or 1
+        worker_pool = ProcessPoolExecutor(max_workers=worker_count)
+
+    #############
+    # Main Loop #
+    #############
     while True:
         if worker_pool is None:
             fitness_scores = calculate_fitness_population(population)
@@ -325,16 +382,29 @@ def run_evolution(
             best_fitness_ever = 100
             generations_without_improvement = 0
             generation = 0
-            continue
-
-        population = evolve_population(
-            population,
-            fitness_scores,
-            mutation_rate,
-            elitism_rate,
-            tournament_members,
-            row_mutable_indices,
-        )
+        else:
+            if worker_pool is None:
+                population = evolve_population(
+                    population,
+                    fitness_scores,
+                    mutation_rate,
+                    elitism_rate,
+                    tournament_members,
+                    row_mutable_indices,
+                    seed
+                )
+            else:
+                population = evolve_population_parallel(
+                    population,
+                    fitness_scores,
+                    mutation_rate,
+                    elitism_rate,
+                    tournament_members,
+                    row_mutable_indices,
+                    worker_pool,
+                    worker_count,
+                    seed
+                )
 
         generation += 1
         global_generations += 1
