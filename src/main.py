@@ -43,14 +43,14 @@ test_sudoku: list[list[int]] = [
 SEED = 11
 USE_SEED = "True"  # "True" or "False"
 USE_PARALLELIZATION = "False"  # "True" or "False"
-GUI = "Generations"  # "Sudoku", "Generations", or "None"
+GUI = "Sudoku"  # "Sudoku", "Generations", or "None"
 RUNS = 1  # number of repeated runs for timing
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
 POPULATION_SIZE = 8000
 MUTATION_RATE = 0.10
-ELITISM_RATE = 10
+ELITISM_SIZE = 10
 TOURNAMENT_MEMBERS = 3
 STAGNATION_LIMIT = 70
 CHUNK_SIZE = (
@@ -142,7 +142,7 @@ def run_once(seed: int) -> float:
         initial_board=INTITIAL_BOARD,
         population=population,
         mutation_rate=MUTATION_RATE,
-        elitism_rate=ELITISM_RATE,
+        elitism_rate=ELITISM_SIZE,
         tournament_members=TOURNAMENT_MEMBERS,
         row_mutable_indices=row_mutable_indices,
         stagnation_limit=STAGNATION_LIMIT,
