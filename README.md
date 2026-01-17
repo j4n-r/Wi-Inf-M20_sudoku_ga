@@ -35,4 +35,12 @@ uv run py-spy record \
         -- python src/main.py
 ```
 
+Benchmark
+
+To start the benchmark that compares single vs. parallel runs. output are graphs and logs
+
+``` bash
+uv run src/benchmark.py
+```
+
 
