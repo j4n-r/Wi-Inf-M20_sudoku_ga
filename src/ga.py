@@ -176,10 +176,10 @@ def get_parents_from_tournament(
 
 
 def get_elites(
-    population: SudokuPopulation, fitness_scores: list[int], elitism_rate: int
+    population: SudokuPopulation, fitness_scores: list[int], elitism_rate: float
 ) -> tuple[list[SudokuCandidate], int]:
     pop_size = len(population)
-    elite_count = min(elitism_rate, pop_size)
+    elite_count = int(elitism_rate * pop_size)
 
     paired: list[tuple[int, SudokuCandidate]] = []
     for i in range(pop_size):
@@ -228,14 +228,14 @@ def evolve_population(
     current_population: SudokuPopulation,
     fitness_scores: list[int],
     mutation_rate: float,
-    elitism_rate: int,
+    elitism_rate: float,
     tournament_size: int,
     row_mutable_indices: list[list[int]],
     seed: int,
 ) -> SudokuPopulation:
     """
     Create the next generation:
-      1) keep the best 'elitism_rate' individuals
+      1) keep the best elitism_rate% individuals
       2) fill the rest via tournament selection -> crossover -> mutation
     """
     next_population: SudokuPopulation = []
@@ -321,7 +321,7 @@ def evolve_population_parallel(
     current_population: SudokuPopulation,
     fitness_scores: list[int],
     mutation_rate: float,
-    elitism_rate: int,
+    elitism_rate: float,
     tournament_members: int,
     row_mutable_indices: list[list[int]],
     worker_pool: ProcessPoolExecutor,
@@ -375,7 +375,7 @@ def run_evolution(
     initial_board: SudokuCandidate,
     population: SudokuPopulation,
     mutation_rate: float,
-    elitism_rate: int,
+    elitism_rate: float,
     tournament_members: int,
     row_mutable_indices: list[list[int]],
     seed: int,
