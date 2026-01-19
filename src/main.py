@@ -34,6 +34,18 @@ test_sudoku: list[list[int]] = [
 #     [0, 5, 2, 0, 7, 0, 0, 0, 0],
 # ]
 
+hard_sudoku = [
+    [0, 0, 0, 0, 4, 6, 5, 0, 0],
+    [0, 0, 0, 0, 0, 0, 9, 0, 0],
+    [0, 0, 6, 0, 0, 3, 0, 2, 0],
+    [0, 0, 3, 0, 8, 0, 0, 0, 0],
+    [0, 0, 0, 4, 0, 9, 0, 8, 0],
+    [0, 9, 0, 0, 0, 0, 0, 6, 0],
+    [7, 0, 0, 0, 9, 0, 0, 0, 5],
+    [2, 4, 0, 8, 1, 0, 0, 0, 0],
+    [0, 5, 0, 0, 3, 0, 0, 0, 0],
+]
+
 
 ###########
 # Config  #
@@ -43,19 +55,20 @@ test_sudoku: list[list[int]] = [
 SEED = 11
 USE_SEED = "True"  # "True" or "False"
 USE_PARALLELIZATION = "False"  # "True" or "False"
-GUI = "Sudoku"  # "Sudoku", "Generations", or "None"
-RUNS = 1  # number of repeated runs for timing
+GUI = "Generations"  # "Sudoku", "Generations", or "None"
+RUNS = 5  # number of repeated runs for timing
 
 # Parameters
 INTITIAL_BOARD = test_sudoku
 POPULATION_SIZE = 8000
 MUTATION_RATE = 0.10
-ELITISM_SIZE = 10
+ELITISM_RATE = 0.05
 TOURNAMENT_MEMBERS = 3
 STAGNATION_LIMIT = 70
 CHUNK_SIZE = (
     400  # how big the array of sudokus is for the fitness calculation for each worker
 )
+POPULATION_SHUFFLE_INTERVAL = 50
 
 
 def validate_sudoku(sudoku: SudokuCandidate) -> None:
@@ -142,7 +155,7 @@ def run_once(seed: int) -> float:
         initial_board=INTITIAL_BOARD,
         population=population,
         mutation_rate=MUTATION_RATE,
-        elitism_rate=ELITISM_SIZE,
+        elitism_rate=ELITISM_RATE,
         tournament_members=TOURNAMENT_MEMBERS,
         row_mutable_indices=row_mutable_indices,
         stagnation_limit=STAGNATION_LIMIT,
@@ -150,6 +163,7 @@ def run_once(seed: int) -> float:
         gui_mode=GUI,
         chunk_size=CHUNK_SIZE,
         seed=seed,
+        population_shuffle_interval=POPULATION_SHUFFLE_INTERVAL,
     )
     now = time.perf_counter()
     elapsed = now - then

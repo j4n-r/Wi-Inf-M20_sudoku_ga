@@ -49,7 +49,7 @@ logging.basicConfig(
 POPULATION_SIZES = [500, 1000, 2000, 4000, 8000, 16000]
 STAGNATION_LIMIT = 70
 MUTATION_RATE = 0.1
-ELITISM_SIZE = 20
+ELITISM_RATE = 0.05
 TOURNAMENT_SIZE = 3
 CHUNK_SIZES = [40, 80, 160, 320, 640, 1280]
 RUNS = 10
@@ -228,7 +228,7 @@ def run_ga(
                         population,
                         fitness_scores,
                         MUTATION_RATE,
-                        ELITISM_SIZE,
+                        ELITISM_RATE,
                         TOURNAMENT_SIZE,
                         row_mutable,
                         generation_seed,
@@ -238,7 +238,7 @@ def run_ga(
                         population,
                         fitness_scores,
                         MUTATION_RATE,
-                        ELITISM_SIZE,
+                        ELITISM_RATE,
                         TOURNAMENT_SIZE,
                         row_mutable,
                         worker_pool,
