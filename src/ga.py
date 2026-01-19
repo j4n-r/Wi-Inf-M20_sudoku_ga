@@ -368,6 +368,9 @@ def evolve_population_parallel(
     for chunk in next_chunks:
         next_population.extend(chunk)
 
+    # shuffle the population, so that next time the childrens in one subpopulation
+    # do not have the same parents
+    random.shuffle(next_population)
     return next_population
 
 
@@ -481,11 +484,6 @@ def run_evolution(
                     worker_count,
                     seed,
                 )
-
-        if global_generations % population_shuffle_interval == 0:
-            # shuffle the population, so that next time the childrens in one subpopulation
-            # do not have the same parents
-            random.shuffle(population)
 
         generation += 1
         global_generations += 1
