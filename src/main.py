@@ -56,6 +56,7 @@ STAGNATION_LIMIT = 70
 CHUNK_SIZE = (
     400  # how big the array of sudokus is for the fitness calculation for each worker
 )
+POPULATION_SHUFFLE_INTERVAL = 20
 
 
 def validate_sudoku(sudoku: SudokuCandidate) -> None:
@@ -150,6 +151,7 @@ def run_once(seed: int) -> float:
         gui_mode=GUI,
         chunk_size=CHUNK_SIZE,
         seed=seed,
+        population_shuffle_interval=POPULATION_SHUFFLE_INTERVAL,
     )
     now = time.perf_counter()
     elapsed = now - then
