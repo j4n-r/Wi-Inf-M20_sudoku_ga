@@ -60,7 +60,6 @@ def make_initial_population(
 
 
 def calculate_fitness(grid: SudokuCandidate) -> int:
-    # same logic you already used inside calculate_population_fitness
     conflicts = 0
 
     # column conflicts
